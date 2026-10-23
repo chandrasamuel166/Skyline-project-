@@ -350,7 +350,7 @@
     // ==========================================
     // SOCKET.IO BACKEND CONNECTION
     // ==========================================
-    const socket = io('http://localhost:3000');
+    const socket = io('https://skyline-project.onrender.com');
 
     socket.on('multiplier_update', (data) => {
       currentMultiplier = data.currentMultiplier;
