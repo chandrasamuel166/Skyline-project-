@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>SKYLINE</title>
+  <!-- Paystack Inline Script -->
+  <script src="https://js.paystack.co/v1/inline.js"></script>
+  <!-- Socket.io Client Script -->
+ <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { background-color: #0d0f12; color: #ffffff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+    #splashScreen { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; user-select: none; }
+    .splash-logo { font-size: 3rem; font-weight: 900; color: #38bdf8; font-style: italic; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; }
+    .plane-icon { font-size: 4rem; animation: floatPlane 1.5s infinite ease-in-out alternate; }
+    @keyframes floatPlane { 0% { transform: translateY(0); } 100% { transform: translateY(-15px); } }
+    .loader-bar { width: 200px; height: 6px; background: #222; border-radius: 10px; overflow: hidden; margin-top: 25px; }
+    .loader-fill { width: 0%; height: 100%; background: #38bdf8; transition: width 0.3s; }
+    
+    /* Auth Modal Styling */
+    #loginModal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 9990; display: none; align-items: center; justify-content: center; padding: 20px; }
+    .login-card { background: #14181f; border-radius: 16px; padding: 24px; width: 100%; max-width: 360px; border: 1px solid #27272a; text-align: center; }
+    .auth-tabs { display: flex; gap: 4px; background: #0b0d11; padding: 4px; border-radius: 10px; margin-bottom: 16px; border: 1px solid #27272a; }
+    .auth-tab-btn { flex: 1; padding: 8px; background: transparent; border: none; color: #8e8e93; font-weight: 800; font-size: 0.85rem; border-radius: 6px; cursor: pointer; }
+    .auth-tab-btn.active { background: #1c222d; color: #38bdf8; }
+    .auth-pane { display: none; }
+    .auth-pane.active { display: block; }
+    .login-input { width: 100%; padding: 12px; background: #0b0d11; border: 1px solid #27272a; color: #fff; border-radius: 8px; margin: 6px 0; outline: none; text-align: center; font-size: 0.95rem; }
+    .btn-enter-game { width: 100%; padding: 12px; background: #22c55e; border: none; color: #fff; font-weight: 900; border-radius: 8px; font-size: 1.1rem; cursor: pointer; margin-top: 10px; }
+    
+    .app-container { width: 100%; max-width: 480px; padding: 10px; display: none; flex-direction: column; }
+    
+    header { width: 100%; display: flex; justify-content: space-between; align-items: center; background: #14181f; padding: 10px 12px; border-radius: 10px; margin-bottom: 8px; }
+    .header-left { display: flex; align-items: center; gap: 8px; }
+    .brand { font-size: 1.1rem; font-weight: 900; color: #38bdf8; font-style: italic; text-transform: uppercase; letter-spacing: 0.5px; user-select: none; white-space: nowrap; }
+    .utility-icon-btn { background: #1c222d; border: 1px solid #27272a; color: #38bdf8; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; cursor: pointer; }
+    
+    .user-info { display: flex; align-items: center; gap: 6px; }
+    .player-tag { font-size: 0.75rem; font-weight: 700; color: #94a3b8; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .top-deposit-btn { background: #22c55e; color: #fff; font-size: 0.7rem; font-weight: 900; padding: 4px 8px; border-radius: 10px; cursor: pointer; text-transform: uppercase; border: none; white-space: nowrap; }
+    .balance-tag { font-size: 0.85rem; font-weight: 800; color: #ffffff; background: #1c222d; padding: 5px 10px; border-radius: 16px; cursor: pointer; white-space: nowrap; }
+    
+    .history-bar { width: 100%; display: flex; gap: 6px; overflow-x: auto; margin-bottom: 8px; padding-bottom: 2px; }
+    .badge { background: #14181f; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; color: #93c5fd; white-space: nowrap; }
+    .badge.purple { color: #c084fc; }
+    .badge.gold { color: #f59e0b; border: 1px solid #f59e0b; }
+    .game-screen { width: 100%; height: 210px; background: #030712; border-radius: 16px; position: relative; overflow: hidden; border: 1px solid #232936; }
+    canvas { width: 100%; height: 100%; display: block; }
+    .overlay { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; z-index: 5; }
+    .multiplier { font-size: 3.8rem; font-weight: 900; color: #ffffff; text-shadow: 0 4px 16px rgba(0,0,0,0.6); }
+    .status-text { font-size: 0.95rem; font-weight: 900; color: #38bdf8; text-transform: uppercase; letter-spacing: 1px; }
+    .screen-players-widget { position: absolute; bottom: 12px; right: 12px; background: rgba(11, 13, 17, 0.75); backdrop-filter: blur(4px); border: 1px solid rgba(255, 255, 255, 0.1); padding: 3px 10px 3px 6px; border-radius: 20px; display: flex; align-items: center; gap: 6px; z-index: 6; }
+    .avatar-stack { display: flex; align-items: center; }
+    .avatar-stack .avatar-circle { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid #0d0f12; margin-right: -6px; background: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: bold; color: #fff; }
+    .player-count-text { font-size: 0.75rem; font-weight: 800; color: #e2e8f0; margin-left: 8px; }
+    .panel-container { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+    .bet-card { background: #14181f; border-radius: 14px; padding: 10px; border: 1px solid #1f2633; }
+    .bet-controls { display: flex; gap: 10px; align-items: center; }
+    .left-inputs { flex: 1.1; display: flex; flex-direction: column; gap: 6px; }
+    
+    .amount-stepper { display: flex; align-items: center; background: #0b0d11; border-radius: 8px; padding: 2px 4px; border: 1px solid #27272a; }
+    .step-btn { background: #1f2633; border: none; color: #fff; width: 28px; height: 28px; border-radius: 50%; font-weight: bold; cursor: pointer; }
+    .amount-input { width: 100%; background: transparent; border: none; color: #fff; text-align: center; font-weight: 800; font-size: 1rem; outline: none; }
+
+    .quick-preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+    .preset-btn { background: #1c222d; border: 1px solid #27272a; color: #a1a1aa; padding: 4px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer; }
+    .auto-cash-row { display: flex; align-items: center; justify-content: space-between; background: #0b0d11; border: 1px solid #27272a; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; color: #94a3b8; }
+    .auto-cash-input { width: 70px; background: #1c222d; border: 1px solid #38bdf8; color: #38bdf8; font-weight: 800; text-align: center; outline: none; font-size: 0.85rem; border-radius: 4px; padding: 2px; }
+    .btn-action-giant { flex: 1.2; height: 85px; border: none; border-radius: 12px; background: #22c55e; color: #ffffff; font-weight: 900; font-size: 1.2rem; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .btn-action-giant .sub-text { font-size: 0.8rem; font-weight: 700; opacity: 0.9; }
+    .btn-waiting-mode { background: #7f1d1d !important; color: #ffffff !important; }
+    .btn-cashout-mode { background: #eab308 !important; color: #000000 !important; }
+    .live-bets-panel { background: #14181f; border-radius: 14px; padding: 12px; margin-top: 10px; border: 1px solid #1f2633; }
+    .bets-header-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.85rem; font-weight: bold; color: #8e8e93; }
+    .total-win-display { color: #22c55e; font-weight: 900; font-size: 0.9rem; }
+    .bets-count-badge { background: #0b0d11; padding: 4px 10px; border-radius: 12px; color: #fff; font-weight: 800; }
+    .bets-table-head { display: flex; justify-content: space-between; font-size: 0.75rem; color: #64748b; font-weight: 700; padding-bottom: 6px; border-bottom: 1px solid #1f2633; margin-bottom: 6px; }
+    .bets-list { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; }
+    .bet-row { display: flex; justify-content: space-between; align-items: center; background: #0b0d11; padding: 8px 10px; border-radius: 8px; font-size: 0.82rem; font-weight: 700; }
+    .player-name { display: flex; align-items: center; gap: 6px; color: #e2e8f0; }
+    .cashout-x { color: #38bdf8; }
+    .win-amt { color: #22c55e; }
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); justify-content: center; align-items: center; z-index: 1001; }
+    .modal-card { background: #14181f; padding: 20px; border-radius: 14px; width: 90%; max-width: 380px; border: 1px solid #27272a; max-height: 90vh; overflow-y: auto; text-align: center; }
+    .wallet-tabs { display: flex; gap: 4px; background: #0b0d11; padding: 4px; border-radius: 10px; margin-bottom: 14px; border: 1px solid #27272a; }
+    .w-tab { flex: 1; padding: 8px; background: transparent; border: none; color: #8e8e93; font-weight: 800; font-size: 0.85rem; border-radius: 6px; cursor: pointer; }
+    .w-tab.active { background: #1c222d; color: #fff; }
+    .wallet-pane { display: none; text-align: left; }
+    .wallet-pane.active { display: block; }
+    .form-label { display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px; margin-top: 8px; text-align: left; }
+    .wallet-select { width: 100%; padding: 12px; background: #0b0d11; border: 1px solid #27272a; color: #fff; border-radius: 8px; margin-bottom: 4px; outline: none; font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+
+  <div id="splashScreen">
+    <div class="splash-logo">SKYLINE</div>
+    <div class="plane-icon">✈️</div>
+    <div class="loader-bar"><div class="loader-fill" id="splashFill"></div></div>
+  </div>
+
+  <!-- AUTH / LOGIN MODAL WITH REGISTER TAB -->
+  <div id="loginModal">
+    <div class="login-card">
+      <h2 style="color:#38bdf8; font-weight:900; margin-bottom:12px; font-style:italic;">SKYLINE</h2>
+      
+      <div class="auth-tabs">
+        <button class="auth-tab-btn active" id="tabLoginBtn" onclick="switchAuthTab('login')">LOGIN</button>
+        <button class="auth-tab-btn" id="tabRegisterBtn" onclick="switchAuthTab('register')">CREATE ACCOUNT</button>
+      </div>
+
+      <!-- LOGIN PANE -->
+      <div class="auth-pane active" id="paneLogin">
+        <input type="text" id="usernameInput" class="login-input" placeholder="Username" value="Player1" />
+        <input type="password" id="passwordInput" class="login-input" placeholder="Password" value="123456" />
+        <button class="btn-enter-game" onclick="enterGameAsPlayer('login')">LOGIN & PLAY</button>
+      </div>
+
+      <!-- REGISTER PANE -->
+      <div class="auth-pane" id="paneRegister">
+        <input type="text" id="regUsernameInput" class="login-input" placeholder="Choose Username" />
+        <input type="email" id="regEmailInput" class="login-input" placeholder="Email Address" />
+        <input type="tel" id="regPhoneInput" class="login-input" placeholder="Phone Number" />
+        <input type="password" id="regPasswordInput" class="login-input" placeholder="Create Password" />
+        <button class="btn-enter-game" style="background:#38bdf8; color:#000;" onclick="enterGameAsPlayer('register')">CREATE ACCOUNT</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-container" id="appContainer">
+    <header>
+      <div class="header-left">
+        <div class="brand">SKYLINE</div>
+        <button class="utility-icon-btn" onclick="openFairModal()" title="Provably Fair">🛡️</button>
+        <button class="utility-icon-btn" id="soundToggleBtn" onclick="toggleSound()" title="Toggle Sound">🔊</button>
+      </div>
+      <div class="user-info">
+        <span class="player-tag" id="displayUsername">Player1</span>
+        <button class="top-deposit-btn" onclick="openWalletModal()">Deposit</button>
+        <div class="balance-tag" onclick="openWalletModal()">₦ <span id="balance">2,900.00</span></div>
+      </div>
+    </header>
+
+    <div class="history-bar" id="history">
+      <div class="badge gold">1245.80x</div>
+      <div class="badge purple">4.11x</div>
+      <div class="badge purple">2.41x</div>
+      <div class="badge">1.09x</div>
+      <div class="badge purple">3.25x</div>
+    </div>
+
+    <div class="game-screen">
+      <canvas id="gameCanvas"></canvas>
+      <div class="overlay">
+        <div class="multiplier" id="multiplierText">1.00x</div>
+        <div class="status-text" id="statusText">WAITING FOR NEXT ROUND...</div>
+      </div>
+      <div class="screen-players-widget">
+        <div class="avatar-stack">
+          <div class="avatar-circle" style="background:#ef4444;">🕶️</div>
+          <div class="avatar-circle" style="background:#10b981;">🐯</div>
+          <div class="avatar-circle" style="background:#3b82f6;">🦁</div>
+        </div>
+        <span class="player-count-text" id="activePlayerCount">5,007</span>
+      </div>
+    </div>
+
+    <div class="panel-container">
+      <!-- BET CARD 1 -->
+      <div class="bet-card">
+        <div class="bet-controls">
+          <div class="left-inputs">
+            <div class="amount-stepper">
+              <button class="step-btn" onclick="adjustAmount(1, -50)">-</button>
+              <input type="number" id="betAmt1" class="amount-input" value="50" />
+              <button class="step-btn" onclick="adjustAmount(1, 50)">+</button>
+            </div>
+            <div class="quick-preset-grid">
+              <button class="preset-btn" onclick="addPreset(1, 100)">+100</button>
+              <button class="preset-btn" onclick="addPreset(1, 200)">+200</button>
+              <button class="preset-btn" onclick="addPreset(1, 500)">+500</button>
+              <button class="preset-btn" onclick="addPreset(1, 1000)">+1,000</button>
+            </div>
+            <div class="auto-cash-row">
+              <span>Auto Cash Out</span>
+              <input type="number" id="autoCash1" class="auto-cash-input" placeholder="2.00" step="0.1" min="1.01" />
+            </div>
+          </div>
+          <button id="mainBtn1" class="btn-action-giant" onclick="handleBetAction(1)">
+            <span>Bet</span>
+            <span class="sub-text" id="subBtn1">50.00 NGN</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- BET CARD 2 -->
+      <div class="bet-card">
+        <div class="bet-controls">
+          <div class="left-inputs">
+            <div class="amount-stepper">
+              <button class="step-btn" onclick="adjustAmount(2, -50)">-</button>
+              <input type="number" id="betAmt2" class="amount-input" value="50" />
+              <button class="step-btn" onclick="adjustAmount(2, 50)">+</button>
+            </div>
+            <div class="quick-preset-grid">
+              <button class="preset-btn" onclick="addPreset(2, 100)">+100</button>
+              <button class="preset-btn" onclick="addPreset(2, 200)">+200</button>
+              <button class="preset-btn" onclick="addPreset(2, 500)">+500</button>
+              <button class="preset-btn" onclick="addPreset(2, 1000)">+1,000</button>
+            </div>
+            <div class="auto-cash-row">
+              <span>Auto Cash Out</span>
+              <input type="number" id="autoCash2" class="auto-cash-input" placeholder="2.00" step="0.1" min="1.01" />
+            </div>
+          </div>
+          <button id="mainBtn2" class="btn-action-giant" onclick="handleBetAction(2)">
+            <span>Bet</span>
+            <span class="sub-text" id="subBtn2">50.00 NGN</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="live-bets-panel">
+      <div class="bets-header-info">
+        <div>All Bets <span class="bets-count-badge">8/8 Bets</span></div>
+        <div class="total-win-display">Total Win: <span id="totalWinAmount">0.00</span> NGN</div>
+      </div>
+      <div class="bets-table-head">
+        <span>Player</span>
+        <span>Bet NGN</span>
+        <span>X</span>
+        <span>Win NGN</span>
+      </div>
+      <div class="bets-list" id="betsList"></div>
+    </div>
+  </div>
+
+  <!-- Wallet Modal -->
+  <div class="modal" id="walletModal">
+    <div class="modal-card">
+      <div class="wallet-tabs">
+        <button class="w-tab active" id="tabDepositBtn" onclick="switchWalletTab('deposit')">Deposit</button>
+        <button class="w-tab" id="tabWithdrawBtn" onclick="switchWalletTab('withdraw')">Withdraw</button>
+      </div>
+
+      <!-- Deposit Pane -->
+      <div class="wallet-pane active" id="paneDeposit">
+        <h3 style="color:#22c55e; font-weight:900; margin-bottom:4px;">💳 ADD FUNDS</h3>
+        <p style="font-size:0.75rem; color:#8e8e93; margin-bottom:12px;">Fund your account securely via Paystack</p>
+        
+        <label class="form-label">Deposit Method Option</label>
+        <select id="depositSourceType" class="wallet-select" onchange="toggleDepositSourceFields()">
+          <option value="saved_deposit_bank">Use my Usual Deposit Bank</option>
+          <option value="different_deposit_bank">Deposit with a Different Bank Account</option>
+        </select>
+
+        <div id="differentDepositFields" style="display:none;">
+          <label class="form-label">Select Bank Name</label>
+          <select id="newDepositBank" class="wallet-select">
+            <option value="Opay">Opay Digital Services</option>
+            <option value="Moniepoint">Moniepoint Microfinance Bank</option>
+            <option value="Kuda">Kuda Bank</option>
+            <option value="Access">Access Bank</option>
+            <option value="GTBank">Guaranty Trust Bank</option>
+            <option value="UBA">United Bank for Africa</option>
+            <option value="Zenith">Zenith Bank</option>
+            <option value="Fidelity">Fidelity Bank</option>
+          </select>
+
+          <label class="form-label">Account Number You Are Depositing From</label>
+          <input type="text" id="newDepositAccNum" class="login-input" placeholder="10-Digit Account Number" />
+        </div>
+
+        <div id="defaultDepositBankBox" style="background:#0b0d11; border:1px solid #27272a; padding:10px; border-radius:8px; margin:8px 0; font-size:0.8rem; text-align:left;">
+          <span style="color:#94a3b8; display:block;">Usual Source Bank:</span>
+          <strong id="summaryUsualDepositBank" style="color:#fff;">Opay - 0123456789 (Default)</strong>
+        </div>
+
+        <label class="form-label">Amount to Add (NGN)</label>
+        <input type="number" id="depositAmountInput" class="login-input" placeholder="Amount" value="50000" />
+        
+        <button class="btn-enter-game" style="background:#22c55e;" onclick="initiateRealDepositVerification()">PROCEED & PAY VIA PAYSTACK</button>
+      </div>
+
+      <!-- Withdrawal Pane -->
+      <div class="wallet-pane" id="paneWithdraw">
+        <h3 style="color:#38bdf8; font-weight:900; margin-bottom:4px;">💸 WITHDRAW FUNDS</h3>
+        <p style="font-size:0.75rem; color:#8e8e93; margin-bottom:12px;">Payout winnings safely to your bank account</p>
+
+        <label class="form-label">Destination Bank Option</label>
+        <select id="withdrawDestinationType" class="wallet-select" onchange="toggleWithdrawDestinationFields()">
+          <option value="deposit_account">Use my Deposit Bank Account</option>
+          <option value="another_bank">Withdraw to Another Bank</option>
+        </select>
+
+        <div id="anotherBankFields" style="display:none;">
+          <label class="form-label">Select Target Bank</label>
+          <select id="newWithdrawBank" class="wallet-select">
+            <option value="Opay">Opay Digital Services</option>
+            <option value="Moniepoint">Moniepoint Microfinance Bank</option>
+            <option value="Kuda">Kuda Bank</option>
+            <option value="Access">Access Bank</option>
+            <option value="GTBank">Guaranty Trust Bank</option>
+            <option value="UBA">United Bank for Africa</option>
+            <option value="Zenith">Zenith Bank</option>
+            <option value="Fidelity">Fidelity Bank</option>
+          </select>
+
+          <label class="form-label">New Bank Account Number</label>
+          <input type="text" id="newWithdrawAccNum" class="login-input" placeholder="10-Digit Account Number" />
+
+          <label class="form-label">Account Name</label>
+          <input type="text" id="newWithdrawAccName" class="login-input" placeholder="Full Name on Account" />
+        </div>
+
+        <div id="defaultBankInfoBox" style="background:#0b0d11; border:1px solid #27272a; padding:10px; border-radius:8px; margin:8px 0; font-size:0.8rem; text-align:left;">
+          <span style="color:#94a3b8; display:block;">Active Linked Deposit Account:</span>
+          <strong id="summaryDepositBankInfo" style="color:#fff;">Opay - 0123456789</strong>
+        </div>
+
+        <label class="form-label">Withdrawal Amount (NGN)</label>
+        <input type="number" id="withdrawAmountInput" class="login-input" placeholder="Amount to withdraw" value="5000" />
+
+        <button class="btn-enter-game" style="background:#38bdf8; color:#000;" onclick="processWithdrawal()">REQUEST WITHDRAWAL</button>
+      </div>
+
+      <button style="width:100%; padding:8px; margin-top:12px; background:transparent; color:#8e8e93; border:none; cursor:pointer;" onclick="closeWalletModal()">Close</button>
+    </div>
+  </div>
+
+  <!-- Provably Fair Modal -->
+  <div class="modal" id="fairModal">
+    <div class="modal-card">
+      <h3 style="color:#38bdf8; font-weight:900; margin-bottom:6px;">🛡️ PROVABLY FAIR</h3>
+      <p style="font-size:0.75rem; color:#8e8e93; margin-bottom:12px; text-align:left;">Skyline uses cryptographic algorithms to ensure 100% random and tamper-proof flight crash points.</p>
+      
+      <label class="form-label">Server Seed Hash (SHA-256)</label>
+      <input type="text" class="login-input" value="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" readonly style="font-size:0.7rem; color:#38bdf8;" />
+
+      <label class="form-label">Current Round Status</label>
+      <input type="text" class="login-input" value="Verified Secure & Encrypted" readonly style="font-size:0.8rem; color:#22c55e;" />
+
+      <button class="btn-enter-game" style="background:#38bdf8; color:#000; margin-top:14px;" onclick="closeFairModal()">CLOSE</button>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // SOCKET.IO BACKEND CONNECTION
+    // ==========================================
+    const socket = io('http://localhost:3000');
+
+    socket.on('multiplier_update', (data) => {
+      currentMultiplier = data.currentMultiplier;
+      document.getElementById('multiplierText').innerText = currentMultiplier.toFixed(2) + 'x';
+      
+      if (bet1Active && !bet1CashedOut) {
+        document.getElementById(`subBtn1`).innerText = `${(bet1Amount * currentMultiplier).toFixed(2)} NGN`;
+      }
+      if (bet2Active && !bet2CashedOut) {
+        document.getElementById(`subBtn2`).innerText = `${(bet2Amount * currentMultiplier).toFixed(2)} NGN`;
+      }
+    });
+
+    socket.on('round_started', (data) => {
+      gameState = 'RUNNING';
+      crashMultiplier = data.crashPoint;
+      currentMultiplier = 1.00;
+      document.getElementById('statusText').innerText = '';
+      document.getElementById('multiplierText').style.color = '#ffffff';
+      
+      if (bet1Active) setBtnCashoutMode(1); else setBtnDisabledMode(1);
+      if (bet2Active) setBtnCashoutMode(2); else setBtnDisabledMode(2);
+    });
+
+    socket.on('round_crashed', (data) => {
+      crashMultiplier = data.crashPoint;
+      triggerFlyAway();
+    });
+
+    // ==========================================
+    // GAME & USER STATE
+    // ==========================================
+    let balance = 2900.00;
+    let soundEnabled = true;
+    
+    let userDepositProfile = {
+      bankName: "Opay",
+      accountNumber: "0123456789"
+    };
+
+    let gameState = 'IDLE'; 
+    let currentMultiplier = 1.00;
+    let crashMultiplier = 1.00;
+    let startTime, animId, flyAwayStartTime;
+    let lastX = 0, lastY = 0;
+    
+    let bet1Active = false;
+    let bet1Amount = 50;
+    let bet1CashedOut = false;
+
+    let bet2Active = false;
+    let bet2Amount = 50;
+    let bet2CashedOut = false;
+
+    let breakDuration = 5000;
+    let nextRoundTimer = null;
+    let currentActivePlayers = 0;
+    let playerCountdownInterval = null;
+
+    // Sound Synthesizer
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSound(type) {
+      if (!soundEnabled || !audioCtx) return;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      
+      if (type === 'tick') {
+        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.03);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.03);
+      } else if (type === 'win') {
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+      } else if (type === 'crash') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 0.35);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.35);
+      }
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      document.getElementById('soundToggleBtn').innerText = soundEnabled ? '🔊' : '🔇';
+    }
+
+    const mockPlayers = [
+      { name: "k***3", bet: 116078.21, cashed: false, x: 0, win: 0, avatar: "🕶️" },
+      { name: "9***9", bet: 50000.00, cashed: false, x: 0, win: 0, avatar: "🐯" },
+      { name: "o***y", bet: 30000.00, cashed: false, x: 0, win: 0, avatar: "🦒" },
+      { name: "b***5", bet: 25000.00, cashed: false, x: 0, win: 0, avatar: "🦁" },
+      { name: "j***e", bet: 21105.12, cashed: false, x: 0, win: 0, avatar: "🎲" },
+      { name: "n***e", bet: 20049.87, cashed: false, x: 0, win: 0, avatar: "🕶️" },
+      { name: "u***2", bet: 20000.00, cashed: false, x: 0, win: 0, avatar: "🐵" },
+      { name: "y***4", bet: 20000.00, cashed: false, x: 0, win: 0, avatar: "🦅" }
+    ];
+
+    window.addEventListener('load', () => {
+      let fill = document.getElementById('splashFill');
+      let w = 0;
+      let interval = setInterval(() => {
+        w += 10;
+        fill.style.width = w + '%';
+        if (w >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            document.getElementById('splashScreen').style.display = 'none';
+            document.getElementById('loginModal').style.display = 'flex';
+          }, 300);
+        }
+      }, 120);
+    });
+
+    function switchAuthTab(mode) {
+      const tabLog = document.getElementById('tabLoginBtn');
+      const tabReg = document.getElementById('tabRegisterBtn');
+      const paneLog = document.getElementById('paneLogin');
+      const paneReg = document.getElementById('paneRegister');
+
+      if (mode === 'login') {
+        tabLog.classList.add('active');
+        tabReg.classList.remove('active');
+        paneLog.classList.add('active');
+        paneReg.classList.remove('active');
+      } else {
+        tabReg.classList.add('active');
+        tabLog.classList.remove('active');
+        paneReg.classList.add('active');
+        paneLog.classList.remove('active');
+      }
+    }
+
+    function enterGameAsPlayer(mode) {
+      let username = "";
+      if (mode === 'login') {
+        username = document.getElementById('usernameInput').value.trim();
+        const passVal = document.getElementById('passwordInput').value.trim();
+        if (!username || !passVal) { alert("Please enter both Username and Password."); return; }
+      } else {
+        username = document.getElementById('regUsernameInput').value.trim();
+        const email = document.getElementById('regEmailInput').value.trim();
+        const phone = document.getElementById('regPhoneInput').value.trim();
+        const pass = document.getElementById('regPasswordInput').value.trim();
+        if (!username || !email || !phone || !pass) { alert("Please fill in all registration fields."); return; }
+      }
+
+      document.getElementById('displayUsername').innerText = username;
+      document.getElementById('loginModal').style.display = 'none';
+      document.getElementById('appContainer').style.display = 'flex';
+      resizeCanvas();
+      renderBetsList();
+    }
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    function resizeCanvas() {
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+      drawBackgroundRays();
+    }
+
+    function adjustAmount(id, delta) {
+      const input = document.getElementById(`betAmt${id}`);
+      let val = Math.max(50, (parseFloat(input.value) || 0) + delta);
+      input.value = val;
+      let active = (id === 1) ? bet1Active : bet2Active;
+      if (!active) document.getElementById(`subBtn${id}`).innerText = `${val.toFixed(2)} NGN`;
+    }
+
+    function addPreset(id, val) {
+      const input = document.getElementById(`betAmt${id}`);
+      let currentVal = parseFloat(input.value) || 0;
+      let newVal = currentVal + val;
+      input.value = newVal;
+      let active = (id === 1) ? bet1Active : bet2Active;
+      if (!active) document.getElementById(`subBtn${id}`).innerText = `${newVal.toFixed(2)} NGN`;
+    }
+
+    function openWalletModal() { 
+      document.getElementById('walletModal').style.display = 'flex'; 
+      switchWalletTab('deposit');
+      updateWalletUIStates();
+    }
+    
+    function closeWalletModal() { 
+      document.getElementById('walletModal').style.display = 'none'; 
+    }
+
+    function openFairModal() {
+      document.getElementById('fairModal').style.display = 'flex';
+    }
+
+    function closeFairModal() {
+      document.getElementById('fairModal').style.display = 'none';
+    }
+
+    function switchWalletTab(tabName) {
+      const tabDep = document.getElementById('tabDepositBtn');
+      const tabWith = document.getElementById('tabWithdrawBtn');
+      const paneDep = document.getElementById('paneDeposit');
+      const paneWith = document.getElementById('paneWithdraw');
+
+      if (tabName === 'deposit') {
+        tabDep.classList.add('active');
+        tabWith.classList.remove('active');
+        paneDep.classList.add('active');
+        paneWith.classList.remove('active');
+      } else if (tabName === 'withdraw') {
+        tabWith.classList.add('active');
+        tabDep.classList.remove('active');
+        paneDep.classList.remove('active');
+        paneWith.classList.add('active');
+        updateWalletUIStates();
+      }
+    }
+
+    function toggleDepositSourceFields() {
+      const sourceType = document.getElementById('depositSourceType').value;
+      const diffFields = document.getElementById('differentDepositFields');
+      const defaultBox = document.getElementById('defaultDepositBankBox');
+
+      if (sourceType === 'different_deposit_bank') {
+        diffFields.style.display = 'block';
+        defaultBox.style.display = 'none';
+      } else {
+        diffFields.style.display = 'none';
+        defaultBox.style.display = 'block';
+      }
+    }
+
+    function updateWalletUIStates() {
+      const usualBoxText = document.getElementById('summaryUsualDepositBank');
+      if (userDepositProfile.accountNumber) {
+        usualBoxText.innerText = `${userDepositProfile.bankName} -${userDepositProfile.accountNumber}`;
+      }
+
+      const infoBox = document.getElementById('summaryDepositBankInfo');
+      if (userDepositProfile.accountNumber) {
+        infoBox.innerText = `${userDepositProfile.bankName} -${userDepositProfile.accountNumber}`;
+        infoBox.style.color = '#22c55e';
+      } else {
+        infoBox.innerText = "No deposit account registered yet. Select another bank.";
+        infoBox.style.color = '#f87171';
+      }
+    }
+
+    function initiateRealDepositVerification() {
+      const addAmt = parseFloat(document.getElementById('depositAmountInput').value) || 0;
+      const playerUsername = document.getElementById('displayUsername').innerText || "player@skyline.game";
+
+      if (addAmt <= 0) {
+        alert("Please enter a valid deposit amount.");
+        return;
+      }
+
+      let handler = PaystackPop.setup({
+        key: 'pk_test_d3678d70ea2ef0738517edd3ed13e844860ff3c8',
+        email: playerUsername + '@gmail.com',
+        amount: addAmt * 100,
+        currency: 'NGN',
+        callback: function(response) {
+          balance += addAmt;
+          updateBalanceDisplay();
+          closeWalletModal();
+          alert('Deposit Successful! Reference: ' + response.reference);
+        },
+        onClose: function() {
+          alert('Transaction was cancelled.');
+        }
+      });
+      handler.openIframe();
+    }
+
+    function toggleWithdrawDestinationFields() {
+      const destType = document.getElementById('withdrawDestinationType').value;
+      const anotherBankFields = document.getElementById('anotherBankFields');
+      const defaultBox = document.getElementById('defaultBankInfoBox');
+
+      if (destType === 'another_bank') {
+        anotherBankFields.style.display = 'block';
+        defaultBox.style.display = 'none';
+      } else {
+        anotherBankFields.style.display = 'none';
+        defaultBox.style.display = 'block';
+      }
+    }
+
+    function processWithdrawal() {
+      const wAmt = parseFloat(document.getElementById('withdrawAmountInput').value) || 0;
+      const destType = document.getElementById('withdrawDestinationType').value;
+
+      if (wAmt <= 0) {
+        alert("Please enter a valid withdrawal amount.");
+        return;
+      }
+
+      if (wAmt > balance) {
+        alert("Insufficient balance for this withdrawal request.");
+        return;
+      }
+
+      let payoutDestinationDesc = "";
+      if (destType === 'deposit_account') {
+        if (!userDepositProfile.accountNumber) {
+          alert("No deposit account registered. Please use 'Withdraw to Another Bank'.");
+          return;
+        }
+        payoutDestinationDesc = `${userDepositProfile.bankName} account (${userDepositProfile.accountNumber})`;
+      } else {
+        const targetBank = document.getElementById('newWithdrawBank').value;
+        const targetAcc = document.getElementById('newWithdrawAccNum').value.trim();
+        const targetName = document.getElementById('newWithdrawAccName').value.trim();
+
+        if (!targetAcc || !targetName) {
+          alert("Please fill in the new bank account number and account name.");
+          return;
+        }
+        payoutDestinationDesc = `${targetBank} - ${targetAcc} (${targetName})`;
+      }
+
+      balance -= wAmt;
+      updateBalanceDisplay();
+      closeWalletModal();
+      alert(`Withdrawal request of ₦${wAmt.toLocaleString()} to your${payoutDestinationDesc} has been submitted successfully!`);
+    }
+
+    function handleBetAction(id) {
+      const amt = parseFloat(document.getElementById(`betAmt${id}`).value) || 50;
+      let isBetActive = (id === 1) ? bet1Active : bet2Active;
+      let isCashedOut = (id === 1) ? bet1CashedOut : bet2CashedOut;
+
+      if (gameState === 'IDLE' || document.getElementById('statusText').innerText.includes('WAITING')) {
+        if (!isBetActive && amt <= balance) {
+          balance -= amt; 
+          if (id === 1) { bet1Active = true; bet1Amount = amt; bet1CashedOut = false; }
+          else { bet2Active = true; bet2Amount = amt; bet2CashedOut = false; }
+          
+          updateBalanceDisplay();
+          const btn = document.getElementById(`mainBtn${id}`);
+          btn.className = 'btn-action-giant btn-waiting-mode';
+          btn.querySelector('span').innerText = 'Cancel';
+          document.getElementById(`subBtn${id}`).innerText = 'Waiting for next round';
+        }
+      } else if (gameState === 'RUNNING' && isBetActive && !isCashedOut) {
+        triggerCashOut(id);
+      }
+    }
+
+    function triggerCashOut(id) {
+      if (id === 1) { if (bet1CashedOut) return; bet1CashedOut = true; }
+      else { if (bet2CashedOut) return; bet2CashedOut = true; }
+      
+      let activeAmt = (id === 1) ? bet1Amount : bet2Amount;
+      const win = activeAmt * currentMultiplier;
+      balance += win; 
+      updateBalanceDisplay();
+      playSound('win');
+      
+      const btn = document.getElementById(`mainBtn${id}`);
+      btn.className = 'btn-action-giant';
+      btn.style.background = '#27272a';
+      btn.querySelector('span').innerText = 'WON';
+      document.getElementById(`subBtn${id}`).innerText = `${win.toFixed(2)} NGN`;
+    }
+
+    function setBtnCashoutMode(id) {
+      const btn = document.getElementById(`mainBtn${id}`);
+      btn.className = 'btn-action-giant btn-cashout-mode';
+      btn.querySelector('span').innerText = 'CASH OUT';
+      let activeAmt = (id === 1) ? bet1Amount : bet2Amount;
+      document.getElementById(`subBtn${id}`).innerText = `${(activeAmt * currentMultiplier).toFixed(2)} NGN`;
+    }
+
+    function setBtnDisabledMode(id) {
+      const btn = document.getElementById(`mainBtn${id}`);
+      btn.className = 'btn-action-giant';
+      btn.style.background = '#27272a';
+      btn.querySelector('span').innerText = 'IN GAME';
+      document.getElementById(`subBtn${id}`).innerText = 'WAITING';
+    }
+
+    function drawBackgroundRays(isRed = false) {
+      const cx = 0, cy = canvas.height, numRays = 16, angleStep = (Math.PI / 2) / numRays;
+      ctx.fillStyle = isRed ? '#180608' : '#030712';
+      for (let i = 0; i < numRays; i += 2) {
+        ctx.beginPath(); ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, Math.max(canvas.width, canvas.height) * 1.5, i * angleStep, (i + 1) * angleStep);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+
+    function drawAirplane(x, y, color, angle = -0.25) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle); 
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(15, 0);
+      ctx.lineTo(-20, 8);
+      ctx.lineTo(-12, -3);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(-2, 2);
+      ctx.lineTo(-10, 14);
+      ctx.lineTo(-14, 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function triggerFlyAway() {
+      gameState = 'FLYING_AWAY';
+      playSound('crash');
+
+      const statusEl = document.getElementById('statusText');
+      statusEl.innerText = 'FLEW AWAY!';
+      statusEl.style.color = '#ff2a5f';
+      document.getElementById('multiplierText').style.color = '#ff2a5f';
+
+      const badge = document.createElement('div');
+      let badgeClass = crashMultiplier >= 100 ? 'gold' : (crashMultiplier > 2 ? 'purple' : '');
+      badge.className = `badge ${badgeClass}`;
+      badge.innerText = crashMultiplier.toFixed(2) + 'x';
+      document.getElementById('history').prepend(badge);
+
+      setTimeout(resetGame, 3000);
+    }
+
+    function resetGame() {
+      gameState = 'IDLE'; 
+      bet1Active = false; 
+      bet2Active = false; 
+      cancelAnimationFrame(animId);
+      
+      document.getElementById('multiplierText').style.color = '#ffffff';
+      document.getElementById('multiplierText').innerText = '1.00x';
+      document.getElementById('statusText').innerText = 'WAITING FOR NEXT ROUND...';
+
+      const btn1 = document.getElementById('mainBtn1');
+      btn1.className = 'btn-action-giant'; btn1.style.background = '#22c55e';
+      btn1.querySelector('span').innerText = 'Bet';
+      document.getElementById('subBtn1').innerText = `${parseFloat(document.getElementById('betAmt1').value).toFixed(2)} NGN`;
+
+      const btn2 = document.getElementById('mainBtn2');
+      btn2.className = 'btn-action-giant'; btn2.style.background = '#22c55e';
+      btn2.querySelector('span').innerText = 'Bet';
+      document.getElementById('subBtn2').innerText = `${parseFloat(document.getElementById('betAmt2').value).toFixed(2)} NGN`;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawBackgroundRays(false);
+    }
+
+    function renderBetsList() {
+      const list = document.getElementById('betsList');
+      list.innerHTML = ``;
+      let totalWin = 0;
+      mockPlayers.forEach(p => {
+        if (p.cashed) totalWin += p.win;
+        const row = document.createElement('div');
+        row.className = 'bet-row';
+        row.innerHTML = `
+          <div class="player-name"><span>${p.avatar}</span> <span>${p.name}</span></div>
+          <div>${p.bet.toLocaleString('en-US', {minimumFractionDigits:2})}</div>
+          <div class="cashout-x">${p.cashed ? p.x.toFixed(2) + 'x' : ''}</div>
+          <div class="win-amt">${p.cashed ? p.win.toLocaleString('en-US', {maximumFractionDigits:2}) : ''}</div>
+        `;
+        list.appendChild(row);
+      });
+      document.getElementById('totalWinAmount').innerText = totalWin.toLocaleString('en-US', {minimumFractionDigits: 2});
+    }
+
+    function updateBalanceDisplay() {
+      document.getElementById('balance').innerText = balance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+    }
+  </script>
+</body>
+</html>
+
