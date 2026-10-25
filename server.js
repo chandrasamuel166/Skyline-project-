@@ -54,6 +54,7 @@ app.post('/api/login', (req, res) => {
   console.log(`[AUTH] User logged in: ${username}`);
   res.json({ success: true, balance: user.balance, role: user.role });
 });
+
 // Admin Route: Create Player/Demo Account
 app.post('/api/admin/create-user', (req, res) => {
   const { adminUsername, username, password, initialBalance } = req.body;
@@ -122,32 +123,39 @@ function generateServerCrashPoint() {
   }
 }
 
-// 4. Real-Time Game Engine Loop
+// 4. Real-Time Game Engine Loop (Fixed with IDLE State Window)
 function startServerRound() {
-  gameState = 'RUNNING';
+  gameState = 'IDLE';
   currentMultiplier = 1.00;
-  crashPoint = generateServerCrashPoint();
-  
-  console.log(`[GAME] Round started. Target crash: ${crashPoint}x`);
-  io.emit('round_started', { crashPoint });
+  console.log('[GAME] Waiting for next round... Betting is open.');
+  io.emit('round_idle', { gameState, message: 'Waiting for next round...' });
 
-  let startTime = Date.now();
-  let interval = setInterval(() => {
-    let elapsed = (Date.now() - startTime) / 1000;
-    currentMultiplier = parseFloat((1 + Math.pow(elapsed, 1.65) * 0.15).toFixed(2));
+  // Give players a 5-second window to place bets before starting the round
+  setTimeout(() => {
+    gameState = 'RUNNING';
+    crashPoint = generateServerCrashPoint();
+    
+    console.log(`[GAME] Round started. Target crash: ${crashPoint}x`);
+    io.emit('round_started', { crashPoint });
 
-    if (currentMultiplier >= crashPoint) {
-      clearInterval(interval);
-      gameState = 'CRASHED';
-      console.log(`[GAME] Crashed at ${crashPoint}x`);
-      io.emit('round_crashed', { crashPoint });
+    let startTime = Date.now();
+    let interval = setInterval(() => {
+      let elapsed = (Date.now() - startTime) / 1000;
+      currentMultiplier = parseFloat((1 + Math.pow(elapsed, 1.65) * 0.15).toFixed(2));
 
-      // Wait 5 seconds before starting the next round
-      setTimeout(startServerRound, 5000);
-    } else {
-      io.emit('multiplier_update', { currentMultiplier });
-    }
-  }, 100);
+      if (currentMultiplier >= crashPoint) {
+        clearInterval(interval);
+        gameState = 'CRASHED';
+        console.log(`[GAME] Crashed at ${crashPoint}x`);
+        io.emit('round_crashed', { crashPoint });
+
+        // Wait 5 seconds before starting the next round loop
+        setTimeout(startServerRound, 5000);
+      } else {
+        io.emit('multiplier_update', { currentMultiplier });
+      }
+    }, 100);
+  }, 5000); 
 }
 
 // Socket.io Player Connection & Secure Game Actions
