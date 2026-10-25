@@ -376,41 +376,42 @@
         }
       });
 
-      socket.on('round_idle', (data) => {
+            socket.on('round_idle', (data) => {
         gameState = 'IDLE';
-        document.getElementById('multiplierText').style.color = '#ffffff';
-        document.getElementById('multiplierText').innerText = '1.00x';
         document.getElementById('statusText').innerText = 'WAITING FOR NEXT ROUND...';
-
-        // Reset betting buttons for the new round window
+        document.getElementById('multiplierText').style.color = '#ffffff';
+        
+        // Reset betting buttons for the new round
         if (!bet1Active) {
-          const btn1 = document.getElementById('mainBtn1');
-          btn1.className = 'btn-action-giant'; 
-          btn1.style.background = '#22c55e';
-          btn1.querySelector('span').innerText = 'Bet';
-          document.getElementById('subBtn1').innerText = `${parseFloat(document.getElementById('betAmt1').value).toFixed(2)} NGN`;
+          const btn1 = document.getElementById('betBtn1');
+          if(btn1) {
+            btn1.className = 'btn-action-giant';
+            btn1.style.background = '#22c55e';
+            btn1.querySelector('span').innerText = 'Bet';
+          }
         }
-
         if (!bet2Active) {
-          const btn2 = document.getElementById('mainBtn2');
-          btn2.className = 'btn-action-giant'; 
-          btn2.style.background = '#22c55e';
-          btn2.querySelector('span').innerText = 'Bet';
-          document.getElementById('subBtn2').innerText = `${parseFloat(document.getElementById('betAmt2').value).toFixed(2)} NGN`;
+          const btn2 = document.getElementById('betBtn2');
+          if(btn2) {
+            btn2.className = 'btn-action-giant';
+            btn2.style.background = '#22c55e';
+            btn2.querySelector('span').innerText = 'Bet';
+          }
         }
       });
-
       socket.on('round_started', (data) => {
+          socket.on('round_started', (data) => {
         gameState = 'RUNNING';
         crashMultiplier = data.crashPoint;
         currentMultiplier = 1.00;
-        document.getElementById('statusText').innerText = '';
+        
+        // Clears the waiting text so the screen goes active
+        document.getElementById('statusText').innerText = ''; 
         document.getElementById('multiplierText').style.color = '#ffffff';
         
         if (bet1Active) setBtnCashoutMode(1); else setBtnDisabledMode(1);
         if (bet2Active) setBtnCashoutMode(2); else setBtnDisabledMode(2);
       });
-
       socket.on('round_crashed', (data) => {
         crashMultiplier = data.crashPoint;
         triggerFlyAway();
