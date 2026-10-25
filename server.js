@@ -5,7 +5,12 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 const PAYSTACK_SECRET_KEY = 'sk_test_95d8892c1cd4784eed4fc4d8ebaecccaa4e57b88';
 
 // Middleware
