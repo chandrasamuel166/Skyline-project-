@@ -355,11 +355,12 @@
 
     window.addEventListener('DOMContentLoaded', () => {
               // Auto-clear splash screen safeguard
-        setTimeout(() => {
+              setTimeout(() => {
           const splash = document.getElementById('splashScreen');
-          if (splash) splash.style.display = 'none';
+          if (splash) {
+            splash.style.display = 'none';
+          }
         }, 1500);
-
       socket = io('https://skyline-project.onrender.com');
 
       socket.on('connect', () => {
