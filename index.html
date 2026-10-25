@@ -354,10 +354,12 @@
     let socket;
 
     window.addEventListener('DOMContentLoaded', () => {
-  const s = document.getElementById('splashScreen');
-  if (s) {
-    s.style.display = 'none';
-  }
+  setTimeout(() => {
+    const s = document.getElementById('splashScreen');
+    if (s) {
+      s.style.display = 'none';
+    }
+  }, 2000);
 });
 
 socket = io('https://skyline-project.onrender.com');
