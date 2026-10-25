@@ -7,20 +7,7 @@
   <!-- Paystack Inline Script -->
   <script src="https://js.paystack.co/v1/inline.js"></script>
   <!-- Socket.io Client Script -->
- <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<script>
-  window.addEventListener('DOMContentLoaded', () => {
-      const socket = io('https://skyline-project.onrender.com');
-
-      socket.on('connect', () => {
-          console.log('Connected to Render backend successfully!');
-      });
-
-      socket.on('connect_error', (err) => {
-          console.error('Connection error:', err);
-      });
-  });
-</script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
@@ -362,36 +349,72 @@
 
   <script>
     // ==========================================
-    // SOCKET.IO BACKEND CONNECTION
+    // GLOBAL SOCKET & BACKEND CONNECTION
     // ==========================================
-    const socket = io('https://skyline-project.onrender.com');
+    let socket;
 
-    socket.on('multiplier_update', (data) => {
-      currentMultiplier = data.currentMultiplier;
-      document.getElementById('multiplierText').innerText = currentMultiplier.toFixed(2) + 'x';
-      
-      if (bet1Active && !bet1CashedOut) {
-        document.getElementById(`subBtn1`).innerText = `${(bet1Amount * currentMultiplier).toFixed(2)} NGN`;
-      }
-      if (bet2Active && !bet2CashedOut) {
-        document.getElementById(`subBtn2`).innerText = `${(bet2Amount * currentMultiplier).toFixed(2)} NGN`;
-      }
-    });
+    window.addEventListener('DOMContentLoaded', () => {
+      socket = io('https://skyline-project.onrender.com');
 
-    socket.on('round_started', (data) => {
-      gameState = 'RUNNING';
-      crashMultiplier = data.crashPoint;
-      currentMultiplier = 1.00;
-      document.getElementById('statusText').innerText = '';
-      document.getElementById('multiplierText').style.color = '#ffffff';
-      
-      if (bet1Active) setBtnCashoutMode(1); else setBtnDisabledMode(1);
-      if (bet2Active) setBtnCashoutMode(2); else setBtnDisabledMode(2);
-    });
+      socket.on('connect', () => {
+        console.log('Connected to Render backend successfully!');
+      });
 
-    socket.on('round_crashed', (data) => {
-      crashMultiplier = data.crashPoint;
-      triggerFlyAway();
+      socket.on('connect_error', (err) => {
+        console.error('Connection error:', err);
+      });
+
+      socket.on('multiplier_update', (data) => {
+        currentMultiplier = data.currentMultiplier;
+        document.getElementById('multiplierText').innerText = currentMultiplier.toFixed(2) + 'x';
+        
+        if (bet1Active && !bet1CashedOut) {
+          document.getElementById(`subBtn1`).innerText = `${(bet1Amount * currentMultiplier).toFixed(2)} NGN`;
+        }
+        if (bet2Active && !bet2CashedOut) {
+          document.getElementById(`subBtn2`).innerText = `${(bet2Amount * currentMultiplier).toFixed(2)} NGN`;
+        }
+      });
+
+      socket.on('round_idle', (data) => {
+        gameState = 'IDLE';
+        document.getElementById('multiplierText').style.color = '#ffffff';
+        document.getElementById('multiplierText').innerText = '1.00x';
+        document.getElementById('statusText').innerText = 'WAITING FOR NEXT ROUND...';
+
+        // Reset betting buttons for the new round window
+        if (!bet1Active) {
+          const btn1 = document.getElementById('mainBtn1');
+          btn1.className = 'btn-action-giant'; 
+          btn1.style.background = '#22c55e';
+          btn1.querySelector('span').innerText = 'Bet';
+          document.getElementById('subBtn1').innerText = `${parseFloat(document.getElementById('betAmt1').value).toFixed(2)} NGN`;
+        }
+
+        if (!bet2Active) {
+          const btn2 = document.getElementById('mainBtn2');
+          btn2.className = 'btn-action-giant'; 
+          btn2.style.background = '#22c55e';
+          btn2.querySelector('span').innerText = 'Bet';
+          document.getElementById('subBtn2').innerText = `${parseFloat(document.getElementById('betAmt2').value).toFixed(2)} NGN`;
+        }
+      });
+
+      socket.on('round_started', (data) => {
+        gameState = 'RUNNING';
+        crashMultiplier = data.crashPoint;
+        currentMultiplier = 1.00;
+        document.getElementById('statusText').innerText = '';
+        document.getElementById('multiplierText').style.color = '#ffffff';
+        
+        if (bet1Active) setBtnCashoutMode(1); else setBtnDisabledMode(1);
+        if (bet2Active) setBtnCashoutMode(2); else setBtnDisabledMode(2);
+      });
+
+      socket.on('round_crashed', (data) => {
+        crashMultiplier = data.crashPoint;
+        triggerFlyAway();
+      });
     });
 
     // ==========================================
@@ -408,8 +431,7 @@
     let gameState = 'IDLE'; 
     let currentMultiplier = 1.00;
     let crashMultiplier = 1.00;
-    let startTime, animId, flyAwayStartTime;
-    let lastX = 0, lastY = 0;
+    let animId;
     
     let bet1Active = false;
     let bet1Amount = 50;
@@ -418,11 +440,6 @@
     let bet2Active = false;
     let bet2Amount = 50;
     let bet2CashedOut = false;
-
-    let breakDuration = 5000;
-    let nextRoundTimer = null;
-    let currentActivePlayers = 0;
-    let playerCountdownInterval = null;
 
     // Sound Synthesizer
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -765,28 +782,6 @@
       }
     }
 
-    function drawAirplane(x, y, color, angle = -0.25) {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(angle); 
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(15, 0);
-      ctx.lineTo(-20, 8);
-      ctx.lineTo(-12, -3);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.moveTo(-2, 2);
-      ctx.lineTo(-10, 14);
-      ctx.lineTo(-14, 2);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-    }
-
     function triggerFlyAway() {
       gameState = 'FLYING_AWAY';
       playSound('crash');
@@ -801,32 +796,6 @@
       badge.className = `badge ${badgeClass}`;
       badge.innerText = crashMultiplier.toFixed(2) + 'x';
       document.getElementById('history').prepend(badge);
-
-      setTimeout(resetGame, 3000);
-    }
-
-    function resetGame() {
-      gameState = 'IDLE'; 
-      bet1Active = false; 
-      bet2Active = false; 
-      cancelAnimationFrame(animId);
-      
-      document.getElementById('multiplierText').style.color = '#ffffff';
-      document.getElementById('multiplierText').innerText = '1.00x';
-      document.getElementById('statusText').innerText = 'WAITING FOR NEXT ROUND...';
-
-      const btn1 = document.getElementById('mainBtn1');
-      btn1.className = 'btn-action-giant'; btn1.style.background = '#22c55e';
-      btn1.querySelector('span').innerText = 'Bet';
-      document.getElementById('subBtn1').innerText = `${parseFloat(document.getElementById('betAmt1').value).toFixed(2)} NGN`;
-
-      const btn2 = document.getElementById('mainBtn2');
-      btn2.className = 'btn-action-giant'; btn2.style.background = '#22c55e';
-      btn2.querySelector('span').innerText = 'Bet';
-      document.getElementById('subBtn2').innerText = `${parseFloat(document.getElementById('betAmt2').value).toFixed(2)} NGN`;
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawBackgroundRays(false);
     }
 
     function renderBetsList() {
@@ -854,4 +823,3 @@
   </script>
 </body>
 </html>
-
