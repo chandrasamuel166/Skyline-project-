@@ -352,6 +352,10 @@
     // GLOBAL SOCKET & BACKEND CONNECTION
     // ==========================================
     let socket;
+setTimeout(() => {
+  const splash = document.getElementById('splash');
+  if (splash) splash.style.display = 'none';
+}, 1500);
     
 socket = io('https://skyline-project.onrender.com');
 
