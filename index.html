@@ -352,17 +352,8 @@
     // GLOBAL SOCKET & BACKEND CONNECTION
     // ==========================================
     let socket;
-    window.addEventListener('DOMContentLoaded', () => {
-  setTimeout(() => {
-    const splash = document.getElementById('splash');
-    if (splash) {
-      splash.style.display = 'none';
-    }
-  }, 2000);
-});
-
+    
 socket = io('https://skyline-project.onrender.com');
-
 
       socket.on('connect', () => {
         console.log('Connected to Render backend successfully!');
