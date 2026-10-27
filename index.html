@@ -352,13 +352,17 @@
     // GLOBAL SOCKET & BACKEND CONNECTION
     // ==========================================
     let socket;
-setTimeout(() => {
-  document.querySelectorAll('[id*="splash"], [class*="splash"]').forEach(el => {
-    el.style.display = 'none';
-  });
-}, 1500);
-  
-socket = io('https://skyline-project.onrender.com');
+
+    // Hide splash screen smoothly after load / timer
+    setTimeout(() => {
+      document.querySelectorAll('[id*="splash"], [class*="splash"]').forEach(el => {
+        el.style.display = 'none';
+      });
+    }, 1500);
+
+    // Initialize socket connection safely
+    if (typeof io !== 'undefined') {
+      socket = io('https://skyline-project.onrender.com');
 
       socket.on('connect', () => {
         console.log('Connected to Render backend successfully!');
@@ -373,21 +377,20 @@ socket = io('https://skyline-project.onrender.com');
         document.getElementById('multiplierText').innerText = currentMultiplier.toFixed(2) + 'x';
         
         if (bet1Active && !bet1CashedOut) {
-          document.getElementById(`subBtn1`).innerText = `${(bet1Amount * currentMultiplier).toFixed(2)} NGN`;
+          document.getElementById('subBtn1').innerText = `${(bet1Amount * currentMultiplier).toFixed(2)} NGN`;
         }
         if (bet2Active && !bet2CashedOut) {
-          document.getElementById(`subBtn2`).innerText = `${(bet2Amount * currentMultiplier).toFixed(2)} NGN`;
+          document.getElementById('subBtn2').innerText = `${(bet2Amount * currentMultiplier).toFixed(2)} NGN`;
         }
       });
 
-            socket.on('round_idle', (data) => {
+      socket.on('round_idle', (data) => {
         gameState = 'IDLE';
         document.getElementById('statusText').innerText = 'WAITING FOR NEXT ROUND...';
         document.getElementById('multiplierText').style.color = '#ffffff';
         
-        // Reset betting buttons for the new round
         if (!bet1Active) {
-          const btn1 = document.getElementById('betBtn1');
+          const btn1 = document.getElementById('mainBtn1');
           if(btn1) {
             btn1.className = 'btn-action-giant';
             btn1.style.background = '#22c55e';
@@ -395,7 +398,7 @@ socket = io('https://skyline-project.onrender.com');
           }
         }
         if (!bet2Active) {
-          const btn2 = document.getElementById('betBtn2');
+          const btn2 = document.getElementById('mainBtn2');
           if(btn2) {
             btn2.className = 'btn-action-giant';
             btn2.style.background = '#22c55e';
@@ -403,23 +406,24 @@ socket = io('https://skyline-project.onrender.com');
           }
         }
       });
-          socket.on('round_started', (data) => {
+
+      socket.on('round_started', (data) => {
         gameState = 'RUNNING';
         crashMultiplier = data.crashPoint;
         currentMultiplier = 1.00;
         
-        // Clears the waiting text so the screen goes active
         document.getElementById('statusText').innerText = ''; 
         document.getElementById('multiplierText').style.color = '#ffffff';
         
         if (bet1Active) setBtnCashoutMode(1); else setBtnDisabledMode(1);
         if (bet2Active) setBtnCashoutMode(2); else setBtnDisabledMode(2);
       });
+
       socket.on('round_crashed', (data) => {
         crashMultiplier = data.crashPoint;
         triggerFlyAway();
       });
-    });
+    }
 
     // ==========================================
     // GAME & USER STATE
@@ -435,7 +439,6 @@ socket = io('https://skyline-project.onrender.com');
     let gameState = 'IDLE'; 
     let currentMultiplier = 1.00;
     let crashMultiplier = 1.00;
-    let animId;
     
     let bet1Active = false;
     let bet1Amount = 50;
@@ -446,7 +449,9 @@ socket = io('https://skyline-project.onrender.com');
     let bet2CashedOut = false;
 
     // Sound Synthesizer
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = AudioContextClass ? new AudioContextClass() : null;
+
     function playSound(type) {
       if (!soundEnabled || !audioCtx) return;
       if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -492,22 +497,6 @@ socket = io('https://skyline-project.onrender.com');
       { name: "y***4", bet: 20000.00, cashed: false, x: 0, win: 0, avatar: "🦅" }
     ];
 
-    window.addEventListener('load', () => {
-      let fill = document.getElementById('splashFill');
-      let w = 0;
-      let interval = setInterval(() => {
-        w += 10;
-        fill.style.width = w + '%';
-        if (w >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            document.getElementById('splashScreen').style.display = 'none';
-            document.getElementById('loginModal').style.display = 'flex';
-          }, 300);
-        }
-      }, 120);
-    });
-
     function switchAuthTab(mode) {
       const tabLog = document.getElementById('tabLoginBtn');
       const tabReg = document.getElementById('tabRegisterBtn');
@@ -549,8 +538,10 @@ socket = io('https://skyline-project.onrender.com');
     }
 
     const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas ? canvas.getContext('2d') : null;
+
     function resizeCanvas() {
+      if (!canvas) return;
       canvas.width = canvas.parentElement.clientWidth;
       canvas.height = canvas.parentElement.clientHeight;
       drawBackgroundRays();
@@ -628,12 +619,12 @@ socket = io('https://skyline-project.onrender.com');
     function updateWalletUIStates() {
       const usualBoxText = document.getElementById('summaryUsualDepositBank');
       if (userDepositProfile.accountNumber) {
-        usualBoxText.innerText = `${userDepositProfile.bankName} -${userDepositProfile.accountNumber}`;
+        usualBoxText.innerText = `${userDepositProfile.bankName} - ${userDepositProfile.accountNumber}`;
       }
 
       const infoBox = document.getElementById('summaryDepositBankInfo');
       if (userDepositProfile.accountNumber) {
-        infoBox.innerText = `${userDepositProfile.bankName} -${userDepositProfile.accountNumber}`;
+        infoBox.innerText = `${userDepositProfile.bankName} - ${userDepositProfile.accountNumber}`;
         infoBox.style.color = '#22c55e';
       } else {
         infoBox.innerText = "No deposit account registered yet. Select another bank.";
@@ -718,7 +709,7 @@ socket = io('https://skyline-project.onrender.com');
       balance -= wAmt;
       updateBalanceDisplay();
       closeWalletModal();
-      alert(`Withdrawal request of ₦${wAmt.toLocaleString()} to your${payoutDestinationDesc} has been submitted successfully!`);
+      alert(`Withdrawal request of ₦${wAmt.toLocaleString()} to your ${payoutDestinationDesc} has been submitted successfully!`);
     }
 
     function handleBetAction(id) {
@@ -777,6 +768,7 @@ socket = io('https://skyline-project.onrender.com');
     }
 
     function drawBackgroundRays(isRed = false) {
+      if (!ctx || !canvas) return;
       const cx = 0, cy = canvas.height, numRays = 16, angleStep = (Math.PI / 2) / numRays;
       ctx.fillStyle = isRed ? '#180608' : '#030712';
       for (let i = 0; i < numRays; i += 2) {
@@ -804,6 +796,7 @@ socket = io('https://skyline-project.onrender.com');
 
     function renderBetsList() {
       const list = document.getElementById('betsList');
+      if (!list) return;
       list.innerHTML = ``;
       let totalWin = 0;
       mockPlayers.forEach(p => {
