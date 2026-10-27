@@ -408,7 +408,6 @@ socket = io('https://skyline-project.onrender.com');
           }
         }
       });
-      socket.on('round_started', (data) => {
           socket.on('round_started', (data) => {
         gameState = 'RUNNING';
         crashMultiplier = data.crashPoint;
