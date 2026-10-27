@@ -353,10 +353,11 @@
     // ==========================================
     let socket;
 setTimeout(() => {
-  const splash = document.getElementById('splash');
-  if (splash) splash.style.display = 'none';
+  document.querySelectorAll('[id*="splash"], [class*="splash"]').forEach(el => {
+    el.style.display = 'none';
+  });
 }, 1500);
-    
+  
 socket = io('https://skyline-project.onrender.com');
 
       socket.on('connect', () => {
