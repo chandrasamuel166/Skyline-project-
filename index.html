@@ -353,12 +353,7 @@
     // ==========================================
     let socket;
 
-    // Hide splash screen smoothly after load / timer
-    setTimeout(() => {
-      document.querySelectorAll('[id*="splash"], [class*="splash"]').forEach(el => {
-        el.style.display = 'none';
-      });
-    }, 1500);
+ setTimeout(() => { document.querySelectorAll('[id*="splash"], [class*="splash"]').forEach(el => el.style.display = 'none'); document.getElementById('loginModal').style.display = 'flex'; }, 1500);
 
     // Initialize socket connection safely
     if (typeof io !== 'undefined') {
