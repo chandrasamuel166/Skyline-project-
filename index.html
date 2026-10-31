@@ -450,9 +450,8 @@
         checkAutoCashOut(2);
         updateSimulatedPlayersProgress();
 
-        if (gameState === 'RUNNING') {
-          playSound('flight_hum');
-        }
+        // Update active flight engine pitch frequency continuously while running
+        updateFlightEngineAudio(currentMultiplier);
 
         if (bet1Active && !bet1CashedOut) {
           document.getElementById('subBtn1').innerText = `${(bet1Amount * currentMultiplier).toFixed(2)} NGN`;
@@ -464,6 +463,9 @@
 
       socket.on('round_idle', (data) => {
         gameState = 'IDLE';
+        // When waiting for the next round, reset the ambient tone to idling hum
+        resetFlightEngineToIdle();
+
         document.getElementById('statusText').innerText = 'WAITING FOR NEXT ROUND...';
         document.getElementById('multiplierText').style.color = '#ffffff';
         document.getElementById('multiplierText').innerText = '1.00x';
@@ -543,9 +545,68 @@
     let bet2Amount = 50;
     let bet2CashedOut = false;
 
-    // Sound Synthesizer with balanced volumes (so flight sound never drowns out crash/win)
+    // Aviator-style Continuous Ambient Engine Sound Synthesizer variables
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     const audioCtx = AudioContextClass ? new AudioContextClass() : null;
+    let flightOscillator = null;
+    let flightGainNode = null;
+
+    function startPersistentAmbientAudio() {
+      if (!soundEnabled || !audioCtx) return;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      
+      try {
+        if (flightOscillator) return; // Already running
+        
+        flightOscillator = audioCtx.createOscillator();
+        flightGainNode = audioCtx.createGain();
+
+        // Use triangle waveform for a warm, smooth ambient engine hum
+        flightOscillator.type = 'triangle';
+        flightOscillator.frequency.setValueAtTime(110, audioCtx.currentTime); // Low idle hum
+        
+        // Soft background volume so it stays pleasant and never overpowers crash/win
+        flightGainNode.gain.setValueAtTime(0.012, audioCtx.currentTime);
+        
+        flightOscillator.connect(flightGainNode);
+        flightGainNode.connect(audioCtx.destination);
+        
+        flightOscillator.start();
+      } catch (e) {
+        console.error("Audio error:", e);
+      }
+    }
+
+    function updateFlightEngineAudio(multiplier) {
+      if (!soundEnabled || !audioCtx || !flightOscillator) return;
+      try {
+        // Pitch rises smoothly as the multiplier climbs during active flight
+        let targetFreq = Math.min(380, 110 + (multiplier * 22));
+        flightOscillator.frequency.setTargetAtTime(targetFreq, audioCtx.currentTime, 0.1);
+      } catch(e) {}
+    }
+
+    function resetFlightEngineToIdle() {
+      if (!soundEnabled || !audioCtx || !flightOscillator) return;
+      try {
+        // Drop frequency back down to idle hum when round finishes
+        flightOscillator.frequency.setTargetAtTime(110, audioCtx.currentTime, 0.2);
+      } catch(e) {}
+    }
+
+    function stopPersistentAmbientAudio() {
+      try {
+        if (flightOscillator) {
+          flightOscillator.stop();
+          flightOscillator.disconnect();
+          flightOscillator = null;
+        }
+        if (flightGainNode) {
+          flightGainNode.disconnect();
+          flightGainNode = null;
+        }
+      } catch(e) {}
+    }
 
     function playSound(type) {
       if (!soundEnabled || !audioCtx) return;
@@ -556,17 +617,10 @@
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       
-      if (type === 'flight_hum') {
-        // Soft background game sound so it doesn't clash with crash
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(180, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.012, audioCtx.currentTime); // Low non-intrusive volume
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.1);
-      } else if (type === 'win') {
+      if (type === 'win') {
         osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
         osc.start(); osc.stop(audioCtx.currentTime + 0.2);
       } else if (type === 'crash') {
@@ -574,7 +628,7 @@
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(160, audioCtx.currentTime);
         osc.frequency.linearRampToValueAtTime(30, audioCtx.currentTime + 0.45);
-        gain.gain.setValueAtTime(0.25, audioCtx.currentTime); // High volume so it stands out clearly
+        gain.gain.setValueAtTime(0.28, audioCtx.currentTime); 
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.45);
         osc.start(); osc.stop(audioCtx.currentTime + 0.45);
       }
@@ -583,6 +637,11 @@
     function toggleSound() {
       soundEnabled = !soundEnabled;
       document.getElementById('soundToggleBtn').innerText = soundEnabled ? '🔊' : '🔇';
+      if (!soundEnabled) {
+        stopPersistentAmbientAudio();
+      } else {
+        startPersistentAmbientAudio();
+      }
     }
 
     function switchAuthTab(mode) {
@@ -657,6 +716,9 @@
       initCanvasLoop();
       resetSimulatedPlayers();
       updateBalanceDisplay();
+      
+      // Start continuous ambient game audio as soon as player enters the game screen
+      startPersistentAmbientAudio();
     }
 
     function resetButtonUI(id) {
@@ -756,7 +818,7 @@
       let active = (id === 1) ? bet1Active : bet2Active;
       if (!active) {
         const sub = document.getElementById(`subBtn${id}`);
-        if (sub) sub.innerText = `${val.toFixed(2)} NGN`;
+        if (sub) sub.innerText = `${newVal.toFixed(2)} NGN`;
       }
     }
 
