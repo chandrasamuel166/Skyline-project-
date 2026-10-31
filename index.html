@@ -163,7 +163,7 @@
           <div class="avatar-circle" style="background:#10b981;">🐯</div>
           <div class="avatar-circle" style="background:#3b82f6;">🦁</div>
         </div>
-        <span class="player-count-text" id="activePlayerCount">1</span>
+        <span class="player-count-text" id="activePlayerCount">3,250</span>
       </div>
     </div>
 
@@ -375,34 +375,34 @@
     });
 
     // ==========================================
-    // FRESH 1-UPWARDS & DOWNWARD TRAFFIC CYCLE
+    // REALISTIC HIGH-TRAFFIC PLAYER CYCLE
     // ==========================================
-    let currentLivePlayerCount = 1; // Starts fresh at 1 every new betting round
+    let currentLivePlayerCount = 3250;
     let playerTickerInterval = null;
 
-    // Counts UP from 1 upwards during betting/waiting lobby phase
+    // Counts UP rapidly during betting phase starting from a realistic crowd baseline (~3,200 up to ~6,800)
     function startBettingPhaseTraffic() {
-      currentLivePlayerCount = 1; // Reset to 1 fresh at the start of every betting lobby
+      currentLivePlayerCount = Math.floor(Math.random() * 800) + 3000;
       updatePlayerCountDisplay();
 
       if (playerTickerInterval) clearInterval(playerTickerInterval);
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'IDLE') return;
-        let increase = Math.floor(Math.random() * 80) + 25;
-        currentLivePlayerCount += increase;
+        let increase = Math.floor(Math.random() * 250) + 100;
+        currentLivePlayerCount = Math.min(7200, currentLivePlayerCount + increase);
         updatePlayerCountDisplay();
-      }, 1200);
+      }, 800);
     }
 
-    // Counts DOWN during flight phase as players cash out and leave
+    // Counts DOWN during flight phase as players cash out down to ~1,200 remaining
     function startFlightPhaseTraffic() {
       if (playerTickerInterval) clearInterval(playerTickerInterval);
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'RUNNING') return;
-        let decrease = Math.floor(Math.random() * 90) + 30;
-        currentLivePlayerCount = Math.max(120, currentLivePlayerCount - decrease);
+        let decrease = Math.floor(Math.random() * 350) + 120;
+        currentLivePlayerCount = Math.max(1200, currentLivePlayerCount - decrease);
         updatePlayerCountDisplay();
-      }, 1000);
+      }, 700);
     }
 
     function updatePlayerCountDisplay() {
@@ -485,7 +485,7 @@
       socket.on('round_idle', (data) => {
         gameState = 'IDLE';
         resetMelodyTuneToIdle();
-        startBettingPhaseTraffic(); // Resets to 1 and counts UP fresh
+        startBettingPhaseTraffic(); // Counts UP to high realistic crowd numbers
 
         document.getElementById('statusText').innerText = 'WAITING FOR NEXT ROUND...';
         document.getElementById('multiplierText').style.color = '#ffffff';
@@ -565,7 +565,6 @@
         melodyOscillator = audioCtx.createOscillator();
         melodyGainNode = audioCtx.createGain();
 
-        // Sine wave gives a clean, soothing piano / music box harp vibe instead of engine noise
         melodyOscillator.type = 'sine';
         melodyOscillator.frequency.setValueAtTime(440, audioCtx.currentTime); 
         
