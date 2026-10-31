@@ -163,7 +163,7 @@
           <div class="avatar-circle" style="background:#10b981;">🐯</div>
           <div class="avatar-circle" style="background:#3b82f6;">🦁</div>
         </div>
-        <span class="player-count-text" id="activePlayerCount">3,250</span>
+        <span class="player-count-text" id="activePlayerCount">1,850</span>
       </div>
     </div>
 
@@ -375,34 +375,35 @@
     });
 
     // ==========================================
-    // REALISTIC HIGH-TRAFFIC PLAYER CYCLE
+    // REALISTIC HIGH-TRAFFIC PLAYER CYCLE (1k - 7k+)
     // ==========================================
-    let currentLivePlayerCount = 3250;
+    let currentLivePlayerCount = 1850;
     let playerTickerInterval = null;
 
-    // Counts UP rapidly during betting phase starting from a realistic crowd baseline (~3,200 up to ~6,800)
     function startBettingPhaseTraffic() {
-      currentLivePlayerCount = Math.floor(Math.random() * 800) + 3000;
+      currentLivePlayerCount = Math.floor(Math.random() * 1200) + 1200;
       updatePlayerCountDisplay();
 
       if (playerTickerInterval) clearInterval(playerTickerInterval);
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'IDLE') return;
-        let increase = Math.floor(Math.random() * 250) + 100;
-        currentLivePlayerCount = Math.min(7200, currentLivePlayerCount + increase);
+        let jump = Math.floor(Math.random() * 450) + 150;
+        currentLivePlayerCount += jump;
+        if (currentLivePlayerCount > 7400) {
+          currentLivePlayerCount = Math.floor(Math.random() * 1500) + 2000;
+        }
         updatePlayerCountDisplay();
-      }, 800);
+      }, 500);
     }
 
-    // Counts DOWN during flight phase as players cash out down to ~1,200 remaining
     function startFlightPhaseTraffic() {
       if (playerTickerInterval) clearInterval(playerTickerInterval);
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'RUNNING') return;
-        let decrease = Math.floor(Math.random() * 350) + 120;
-        currentLivePlayerCount = Math.max(1200, currentLivePlayerCount - decrease);
+        let drop = Math.floor(Math.random() * 400) + 180;
+        currentLivePlayerCount = Math.max(850, currentLivePlayerCount - drop);
         updatePlayerCountDisplay();
-      }, 700);
+      }, 600);
     }
 
     function updatePlayerCountDisplay() {
@@ -472,7 +473,6 @@
         checkAutoCashOut(1);
         checkAutoCashOut(2);
         updateSimulatedPlayersProgress();
-        updateMelodyTunePitch(currentMultiplier);
 
         if (bet1Active && !bet1CashedOut) {
           document.getElementById('subBtn1').innerText = `${(bet1Amount * currentMultiplier).toFixed(2)} NGN`;
@@ -484,8 +484,7 @@
 
       socket.on('round_idle', (data) => {
         gameState = 'IDLE';
-        resetMelodyTuneToIdle();
-        startBettingPhaseTraffic(); // Counts UP to high realistic crowd numbers
+        startBettingPhaseTraffic();
 
         document.getElementById('statusText').innerText = 'WAITING FOR NEXT ROUND...';
         document.getElementById('multiplierText').style.color = '#ffffff';
@@ -507,7 +506,7 @@
         currentMultiplier = 1.00;
         
         resetSimulatedPlayers();
-        startFlightPhaseTraffic(); // Counts DOWN as flight runs
+        startFlightPhaseTraffic();
 
         document.getElementById('statusText').innerText = ''; 
         document.getElementById('multiplierText').style.color = '#ffffff';
@@ -548,91 +547,80 @@
     let bet2CashedOut = false;
 
     // ==========================================
-    // MUSICAL PIANO / MELODY TUNE SYNTHESIZER
+    // ULTRA-CLEAN PURE SINE PIANO MELODY SYNTHESIZER
     // ==========================================
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    const audioCtx = AudioContextClass ? new AudioContextClass() : null;
-    let melodyOscillator = null;
-    let melodyGainNode = null;
+    let audioCtx = null;
+    let melodyInterval = null;
 
-    function startMusicalMelodyTune() {
-      if (!soundEnabled || !audioCtx) return;
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-      
-      try {
-        if (melodyOscillator) return;
-        
-        melodyOscillator = audioCtx.createOscillator();
-        melodyGainNode = audioCtx.createGain();
-
-        melodyOscillator.type = 'sine';
-        melodyOscillator.frequency.setValueAtTime(440, audioCtx.currentTime); 
-        
-        melodyGainNode.gain.setValueAtTime(0.015, audioCtx.currentTime); 
-        
-        melodyOscillator.connect(melodyGainNode);
-        melodyGainNode.connect(audioCtx.destination);
-        
-        melodyOscillator.start();
-      } catch (e) {
-        console.error("Audio error:", e);
+    function initAudioContext() {
+      if (!audioCtx && AudioContextClass) {
+        audioCtx = new AudioContextClass();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
       }
     }
 
-    function updateMelodyTunePitch(multiplier) {
-      if (!soundEnabled || !audioCtx || !melodyOscillator) return;
+    function playPureSineNote(frequency, duration = 1.0) {
+      if (!soundEnabled) return;
+      initAudioContext();
+      if (!audioCtx) return;
+
       try {
-        let musicalNotes = [440, 493.88, 523.25, 587.33, 659.25, 698.46, 783.99, 880];
-        let noteIndex = Math.min(musicalNotes.length - 1, Math.floor(multiplier) - 1);
-        let targetFreq = musicalNotes[Math.max(0, noteIndex)];
-        melodyOscillator.frequency.setTargetAtTime(targetFreq, audioCtx.currentTime, 0.15);
-      } catch(e) {}
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+        gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.025, audioCtx.currentTime + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
     }
 
-    function resetMelodyTuneToIdle() {
-      if (!soundEnabled || !audioCtx || !melodyOscillator) return;
-      try {
-        melodyOscillator.frequency.setTargetAtTime(440, audioCtx.currentTime, 0.2);
-      } catch(e) {}
-    }
+    function startPianoBackgroundLoop() {
+      if (melodyInterval) clearInterval(melodyInterval);
+      const chordNotes = [261.63, 329.63, 392.00, 523.25, 659.25, 523.25, 392.00, 329.63];
+      let noteIdx = 0;
 
-    function stopMusicalMelodyTune() {
-      try {
-        if (melodyOscillator) {
-          melodyOscillator.stop();
-          melodyOscillator.disconnect();
-          melodyOscillator = null;
-        }
-        if (melodyGainNode) {
-          melodyGainNode.disconnect();
-          melodyGainNode = null;
-        }
-      } catch(e) {}
+      melodyInterval = setInterval(() => {
+        if (!soundEnabled) return;
+        playPureSineNote(chordNotes[noteIdx], 1.4);
+        noteIdx = (noteIdx + 1) % chordNotes.length;
+      }, 1000);
     }
 
     function playSound(type) {
-      if (!soundEnabled || !audioCtx) return;
-      if (audioCtx.state === 'suspended') audioCtx.resume();
+      if (!soundEnabled) return;
+      initAudioContext();
+      if (!audioCtx) return;
       
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
+      osc.type = 'sine';
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       
       if (type === 'win') {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.2);
-        gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.25);
+        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(783.99, audioCtx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.3);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.3);
       } else if (type === 'crash') {
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(200, audioCtx.currentTime);
-        osc.frequency.linearRampToValueAtTime(60, audioCtx.currentTime + 0.35);
-        gain.gain.setValueAtTime(0.18, audioCtx.currentTime); 
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.35);
+        osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(70, audioCtx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime); 
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.3);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.3);
       }
     }
 
@@ -640,9 +628,9 @@
       soundEnabled = !soundEnabled;
       document.getElementById('soundToggleBtn').innerText = soundEnabled ? '🔊' : '🔇';
       if (!soundEnabled) {
-        stopMusicalMelodyTune();
+        if (melodyInterval) clearInterval(melodyInterval);
       } else {
-        startMusicalMelodyTune();
+        startPianoBackgroundLoop();
       }
     }
 
@@ -673,16 +661,21 @@
         if (!username || !passVal) { alert("Please enter both Username and Password."); return; }
 
         if (username.toLowerCase() !== 'owner') {
-          const savedUser = localStorage.getItem('skyline_user_' + username);
-          if (!savedUser) {
+          const savedUserStr = localStorage.getItem('skyline_user_' + username);
+          if (!savedUserStr) {
             alert("Account not found! Please click 'CREATE ACCOUNT' to register first.");
+            return;
+          }
+          const savedUser = JSON.parse(savedUserStr);
+          if (savedUser.pass !== passVal) {
+            alert("Incorrect password! Please check your password and try again.");
             return;
           }
         }
       } else {
         username = document.getElementById('regUsernameInput').value.trim();
         const phone = document.getElementById('regPhoneInput').value.trim();
-        const email = document.getElementById('regEmailInput').value.trim(); // Optional
+        const email = document.getElementById('regEmailInput').value.trim();
         const pass = document.getElementById('regPasswordInput').value.trim();
         
         if (!username || !phone || !pass) { 
@@ -719,7 +712,7 @@
       resetSimulatedPlayers();
       updateBalanceDisplay();
       
-      startMusicalMelodyTune();
+      startPianoBackgroundLoop();
       startBettingPhaseTraffic();
     }
 
@@ -820,7 +813,7 @@
       let active = (id === 1) ? bet1Active : bet2Active;
       if (!active) {
         const sub = document.getElementById(`subBtn${id}`);
-        if (sub) sub.innerText = `${newVal.toFixed(2)} NGN`;
+        if (sub) sub.innerText = `${val.toFixed(2)} NGN`;
       }
     }
 
