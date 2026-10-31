@@ -118,7 +118,7 @@
         <button class="btn-enter-game" onclick="enterGameAsPlayer('login')">LOGIN & PLAY</button>
       </div>
 
-      <!-- REGISTER PANE (Email Optional, Phone Required) -->
+      <!-- REGISTER PANE -->
       <div class="auth-pane" id="paneRegister">
         <input type="text" id="regUsernameInput" class="login-input" placeholder="Choose Username" />
         <input type="tel" id="regPhoneInput" class="login-input" placeholder="Phone Number (Required)" />
@@ -375,35 +375,31 @@
     });
 
     // ==========================================
-    // REALISTIC HIGH-TRAFFIC PLAYER CYCLE (1k - 7k+)
+    // CONTINUOUS UNBROKEN HIGH-TRAFFIC PLAYER CYCLE
     // ==========================================
-    let currentLivePlayerCount = 1850;
+    let currentLivePlayerCount = 2450;
     let playerTickerInterval = null;
 
     function startBettingPhaseTraffic() {
-      currentLivePlayerCount = Math.floor(Math.random() * 1200) + 1200;
-      updatePlayerCountDisplay();
-
       if (playerTickerInterval) clearInterval(playerTickerInterval);
       playerTickerInterval = setInterval(() => {
-        if (gameState !== 'IDLE') return;
-        let jump = Math.floor(Math.random() * 450) + 150;
+        let jump = Math.floor(Math.random() * 350) + 120;
         currentLivePlayerCount += jump;
-        if (currentLivePlayerCount > 7400) {
-          currentLivePlayerCount = Math.floor(Math.random() * 1500) + 2000;
+        if (currentLivePlayerCount > 7800) {
+          currentLivePlayerCount = 4200; // Keeps it smoothly rolling without resetting down to 1 or small numbers
         }
         updatePlayerCountDisplay();
-      }, 500);
+      }, 600);
     }
 
     function startFlightPhaseTraffic() {
       if (playerTickerInterval) clearInterval(playerTickerInterval);
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'RUNNING') return;
-        let drop = Math.floor(Math.random() * 400) + 180;
-        currentLivePlayerCount = Math.max(850, currentLivePlayerCount - drop);
+        let drop = Math.floor(Math.random() * 300) + 120;
+        currentLivePlayerCount = Math.max(900, currentLivePlayerCount - drop);
         updatePlayerCountDisplay();
-      }, 600);
+      }, 700);
     }
 
     function updatePlayerCountDisplay() {
@@ -547,11 +543,10 @@
     let bet2CashedOut = false;
 
     // ==========================================
-    // ULTRA-CLEAN PURE SINE PIANO MELODY SYNTHESIZER
+    // CLEAN AUDIO SYNTHESIZER (BOOSTED CRASH VOLUME)
     // ==========================================
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     let audioCtx = null;
-    let melodyInterval = null;
 
     function initAudioContext() {
       if (!audioCtx && AudioContextClass) {
@@ -562,42 +557,6 @@
       }
     }
 
-    function playPureSineNote(frequency, duration = 1.0) {
-      if (!soundEnabled) return;
-      initAudioContext();
-      if (!audioCtx) return;
-
-      try {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
-
-        gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.025, audioCtx.currentTime + 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
-
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-
-        osc.start();
-        osc.stop(audioCtx.currentTime + duration);
-      } catch (e) {}
-    }
-
-    function startPianoBackgroundLoop() {
-      if (melodyInterval) clearInterval(melodyInterval);
-      const chordNotes = [261.63, 329.63, 392.00, 523.25, 659.25, 523.25, 392.00, 329.63];
-      let noteIdx = 0;
-
-      melodyInterval = setInterval(() => {
-        if (!soundEnabled) return;
-        playPureSineNote(chordNotes[noteIdx], 1.4);
-        noteIdx = (noteIdx + 1) % chordNotes.length;
-      }, 1000);
-    }
-
     function playSound(type) {
       if (!soundEnabled) return;
       initAudioContext();
@@ -605,33 +564,30 @@
       
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
-      osc.type = 'sine';
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       
       if (type === 'win') {
+        osc.type = 'sine';
         osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(783.99, audioCtx.currentTime + 0.25);
-        gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.3);
         osc.start(); osc.stop(audioCtx.currentTime + 0.3);
       } else if (type === 'crash') {
-        osc.frequency.setValueAtTime(180, audioCtx.currentTime);
-        osc.frequency.linearRampToValueAtTime(70, audioCtx.currentTime + 0.3);
-        gain.gain.setValueAtTime(0.05, audioCtx.currentTime); 
-        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.3);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+        // Boosted volume and impact frequency for loud 'flew away' sound
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(160, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 0.5);
+        gain.gain.setValueAtTime(0.35, audioCtx.currentTime); 
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.5);
       }
     }
 
     function toggleSound() {
       soundEnabled = !soundEnabled;
       document.getElementById('soundToggleBtn').innerText = soundEnabled ? '🔊' : '🔇';
-      if (!soundEnabled) {
-        if (melodyInterval) clearInterval(melodyInterval);
-      } else {
-        startPianoBackgroundLoop();
-      }
     }
 
     function switchAuthTab(mode) {
@@ -712,7 +668,6 @@
       resetSimulatedPlayers();
       updateBalanceDisplay();
       
-      startPianoBackgroundLoop();
       startBettingPhaseTraffic();
     }
 
