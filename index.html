@@ -118,11 +118,11 @@
         <button class="btn-enter-game" onclick="enterGameAsPlayer('login')">LOGIN & PLAY</button>
       </div>
 
-      <!-- REGISTER PANE -->
+      <!-- REGISTER PANE (Email Optional, Phone Required) -->
       <div class="auth-pane" id="paneRegister">
         <input type="text" id="regUsernameInput" class="login-input" placeholder="Choose Username" />
-        <input type="email" id="regEmailInput" class="login-input" placeholder="Email Address" />
-        <input type="tel" id="regPhoneInput" class="login-input" placeholder="Phone Number" />
+        <input type="tel" id="regPhoneInput" class="login-input" placeholder="Phone Number (Required)" />
+        <input type="email" id="regEmailInput" class="login-input" placeholder="Email Address (Optional)" />
         <input type="password" id="regPasswordInput" class="login-input" placeholder="Create Password" />
         <button class="btn-enter-game" style="background:#38bdf8; color:#000;" onclick="enterGameAsPlayer('register')">CREATE ACCOUNT</button>
       </div>
@@ -163,7 +163,7 @@
           <div class="avatar-circle" style="background:#10b981;">🐯</div>
           <div class="avatar-circle" style="background:#3b82f6;">🦁</div>
         </div>
-        <span class="player-count-text" id="activePlayerCount">5,007</span>
+        <span class="player-count-text" id="activePlayerCount">4,250</span>
       </div>
     </div>
 
@@ -225,7 +225,7 @@
 
     <div class="live-bets-panel">
       <div class="bets-header-info">
-        <div>All Bets <span class="bets-count-badge">8/8 Bets</span></div>
+        <div>All Bets <span class="bets-count-badge">8/8 Active</span></div>
         <div class="total-win-display">Total Win: <span id="totalWinAmount">0.00</span> NGN</div>
       </div>
       <div class="bets-table-head">
@@ -374,16 +374,59 @@
       }, 70);
     });
 
-    // Dynamic Live Player Counter Ticker
+    // ==========================================
+    // REALISTIC DYNAMIC PLAYER & CASH-OUT SIMULATION
+    // ==========================================
+    
+    // Organic traffic wave player counter ticker (fluctuating between 1,200 and 7,800)
     setInterval(() => {
       const countEl = document.getElementById('activePlayerCount');
       if (countEl) {
-        let current = parseInt(countEl.innerText.replace(/,/g, '')) || 5007;
-        let change = Math.floor(Math.random() * 9) - 4;
-        current = Math.max(4900, current + change);
+        let current = parseInt(countEl.innerText.replace(/,/g, '')) || 4250;
+        let change = Math.floor(Math.random() * 350) - 160; 
+        current = Math.max(1200, Math.min(7800, current + change));
         countEl.innerText = current.toLocaleString();
       }
-    }, 3500);
+    }, 1800);
+
+    let activeSimPlayers = [
+      { name: "k***3", bet: 45000, cashed: false, cashX: 0, win: 0, avatar: "🕶️" },
+      { name: "9***9", bet: 12500, cashed: false, cashX: 0, win: 0, avatar: "🐯" },
+      { name: "o***y", bet: 30000, cashed: false, cashX: 0, win: 0, avatar: "🦒" },
+      { name: "b***5", bet: 8500, cashed: false, cashX: 0, win: 0, avatar: "🦁" },
+      { name: "j***e", bet: 50000, cashed: false, cashX: 0, win: 0, avatar: "🎲" },
+      { name: "n***e", bet: 15000, cashed: false, cashX: 0, win: 0, avatar: "🕶️" },
+      { name: "u***2", bet: 20000, cashed: false, cashX: 0, win: 0, avatar: "🐵" },
+      { name: "y***4", bet: 10000, cashed: false, cashX: 0, win: 0, avatar: "🦅" }
+    ];
+
+    function resetSimulatedPlayers() {
+      activeSimPlayers.forEach(p => {
+        p.cashed = false;
+        p.cashX = parseFloat((1.12 + Math.random() * 4.8).toFixed(2));
+        p.win = p.bet * p.cashX;
+      });
+      renderBetsList();
+    }
+
+    function updateSimulatedPlayersProgress() {
+      if (gameState !== 'RUNNING') return;
+      
+      let remainingCount = 0;
+      activeSimPlayers.forEach(p => {
+        if (!p.cashed && currentMultiplier >= p.cashX) {
+          p.cashed = true; 
+        }
+        if (!p.cashed) remainingCount++;
+      });
+
+      const badgeEl = document.querySelector('.bets-count-badge');
+      if (badgeEl) {
+        badgeEl.innerText = `${activeSimPlayers.length}/${activeSimPlayers.length} Active`;
+      }
+
+      renderBetsList();
+    }
 
     // Initialize socket connection safely with strict state guards
     if (typeof io !== 'undefined') {
@@ -398,7 +441,6 @@
       });
 
       socket.on('multiplier_update', (data) => {
-        // If client joined mid-round, ignore unexpected live multipliers until the game resets to IDLE
         if (gameState === 'IDLE') return;
 
         currentMultiplier = data.currentMultiplier;
@@ -406,6 +448,11 @@
         
         checkAutoCashOut(1);
         checkAutoCashOut(2);
+        updateSimulatedPlayersProgress();
+
+        if (gameState === 'RUNNING') {
+          playSound('flight_hum');
+        }
 
         if (bet1Active && !bet1CashedOut) {
           document.getElementById('subBtn1').innerText = `${(bet1Amount * currentMultiplier).toFixed(2)} NGN`;
@@ -421,13 +468,13 @@
         document.getElementById('multiplierText').style.color = '#ffffff';
         document.getElementById('multiplierText').innerText = '1.00x';
         
-        // Reset all internal bet states safely
         bet1Active = false;
         bet1CashedOut = false;
         bet2Active = false;
         bet2CashedOut = false;
 
-        // Reset Button 1 back to green Bet mode
+        resetSimulatedPlayers();
+
         const btn1 = document.getElementById('mainBtn1');
         if(btn1) {
           btn1.className = 'btn-action-giant';
@@ -437,7 +484,6 @@
           document.getElementById('subBtn1').innerText = `${val1.toFixed(2)} NGN`;
         }
 
-        // Reset Button 2 back to green Bet mode
         const btn2 = document.getElementById('mainBtn2');
         if(btn2) {
           btn2.className = 'btn-action-giant';
@@ -449,7 +495,6 @@
       });
 
       socket.on('round_started', (data) => {
-        // Guard: If user just logged in mid-flight and hasn't placed an active bet, do NOT force them into the game round
         if (!bet1Active && !bet2Active && gameState === 'IDLE' && document.getElementById('loginModal').style.display === 'flex') {
           return;
         }
@@ -458,6 +503,8 @@
         crashMultiplier = data.crashPoint;
         currentMultiplier = 1.00;
         
+        resetSimulatedPlayers();
+
         document.getElementById('statusText').innerText = ''; 
         document.getElementById('multiplierText').style.color = '#ffffff';
         
@@ -496,36 +543,40 @@
     let bet2Amount = 50;
     let bet2CashedOut = false;
 
-    // Sound Synthesizer
+    // Sound Synthesizer with balanced volumes (so flight sound never drowns out crash/win)
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     const audioCtx = AudioContextClass ? new AudioContextClass() : null;
 
     function playSound(type) {
       if (!soundEnabled || !audioCtx) return;
       if (audioCtx.state === 'suspended') audioCtx.resume();
+      
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       
-      if (type === 'tick') {
-        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.03);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.03);
+      if (type === 'flight_hum') {
+        // Soft background game sound so it doesn't clash with crash
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.012, audioCtx.currentTime); // Low non-intrusive volume
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.1);
       } else if (type === 'win') {
         osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
         osc.start(); osc.stop(audioCtx.currentTime + 0.2);
       } else if (type === 'crash') {
+        // Loud, prominent crash explosion sound
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(140, audioCtx.currentTime);
-        osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 0.35);
-        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.35);
+        osc.frequency.setValueAtTime(160, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(30, audioCtx.currentTime + 0.45);
+        gain.gain.setValueAtTime(0.25, audioCtx.currentTime); // High volume so it stands out clearly
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.45);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.45);
       }
     }
 
@@ -533,17 +584,6 @@
       soundEnabled = !soundEnabled;
       document.getElementById('soundToggleBtn').innerText = soundEnabled ? '🔊' : '🔇';
     }
-
-    const mockPlayers = [
-      { name: "k***3", bet: 116078.21, cashed: false, x: 0, win: 0, avatar: "🕶️" },
-      { name: "9***9", bet: 50000.00, cashed: false, x: 0, win: 0, avatar: "🐯" },
-      { name: "o***y", bet: 30000.00, cashed: false, x: 0, win: 0, avatar: "🦒" },
-      { name: "b***5", bet: 25000.00, cashed: false, x: 0, win: 0, avatar: "🦁" },
-      { name: "j***e", bet: 21105.12, cashed: false, x: 0, win: 0, avatar: "🎲" },
-      { name: "n***e", bet: 20049.87, cashed: false, x: 0, win: 0, avatar: "🕶️" },
-      { name: "u***2", bet: 20000.00, cashed: false, x: 0, win: 0, avatar: "🐵" },
-      { name: "y***4", bet: 20000.00, cashed: false, x: 0, win: 0, avatar: "🦅" }
-    ];
 
     function switchAuthTab(mode) {
       const tabLog = document.getElementById('tabLoginBtn');
@@ -580,12 +620,16 @@
         }
       } else {
         username = document.getElementById('regUsernameInput').value.trim();
-        const email = document.getElementById('regEmailInput').value.trim();
         const phone = document.getElementById('regPhoneInput').value.trim();
+        const email = document.getElementById('regEmailInput').value.trim(); // Optional
         const pass = document.getElementById('regPasswordInput').value.trim();
-        if (!username || !email || !phone || !pass) { alert("Please fill in all registration fields."); return; }
+        
+        if (!username || !phone || !pass) { 
+          alert("Please fill in Username, Phone Number, and Password."); 
+          return; 
+        }
 
-        const accountData = { username, email, phone, pass };
+        const accountData = { username, phone, email, pass };
         localStorage.setItem('skyline_user_' + username, JSON.stringify(accountData));
         alert("Account created successfully! You can now log in.");
         switchAuthTab('login');
@@ -597,7 +641,6 @@
         balance = 5000000.00; 
       }
 
-      // Force clean session state on entry
       gameState = 'IDLE';
       bet1Active = false;
       bet1CashedOut = false;
@@ -608,12 +651,11 @@
       document.getElementById('loginModal').style.display = 'none';
       document.getElementById('appContainer').style.display = 'flex';
       
-      // Reset buttons explicitly
       resetButtonUI(1);
       resetButtonUI(2);
 
       initCanvasLoop();
-      renderBetsList();
+      resetSimulatedPlayers();
       updateBalanceDisplay();
     }
 
@@ -911,7 +953,6 @@
           btn.querySelector('span').innerText = 'Cancel';
           document.getElementById(`subBtn${id}`).innerText = 'Waiting for next round';
         } else if (isBetActive) {
-          // Allow canceling before round starts
           balance += amt;
           if (id === 1) { bet1Active = false; } else { bet2Active = false; }
           updateBalanceDisplay();
@@ -976,14 +1017,14 @@
       if (!list) return;
       list.innerHTML = ``;
       let totalWin = 0;
-      mockPlayers.forEach(p => {
+      activeSimPlayers.forEach(p => {
         if (p.cashed) totalWin += p.win;
         const row = document.createElement('div');
         row.className = 'bet-row';
         row.innerHTML = `
           <div class="player-name"><span>${p.avatar}</span> <span>${p.name}</span></div>
           <div>${p.bet.toLocaleString('en-US', {minimumFractionDigits:2})}</div>
-          <div class="cashout-x">${p.cashed ? p.x.toFixed(2) + 'x' : ''}</div>
+          <div class="cashout-x">${p.cashed ? p.cashX.toFixed(2) + 'x' : ''}</div>
           <div class="win-amt">${p.cashed ? p.win.toLocaleString('en-US', {maximumFractionDigits:2}) : ''}</div>
         `;
         list.appendChild(row);
