@@ -379,13 +379,13 @@
       const countEl = document.getElementById('activePlayerCount');
       if (countEl) {
         let current = parseInt(countEl.innerText.replace(/,/g, '')) || 5007;
-        let change = Math.floor(Math.random() * 9) - 4; // -4 to +4
+        let change = Math.floor(Math.random() * 9) - 4;
         current = Math.max(4900, current + change);
         countEl.innerText = current.toLocaleString();
       }
     }, 3500);
 
-    // Initialize socket connection safely
+    // Initialize socket connection safely with strict state guards
     if (typeof io !== 'undefined') {
       socket = io('https://skyline-project.onrender.com');
 
@@ -398,10 +398,12 @@
       });
 
       socket.on('multiplier_update', (data) => {
+        // If client joined mid-round, ignore unexpected live multipliers until the game resets to IDLE
+        if (gameState === 'IDLE') return;
+
         currentMultiplier = data.currentMultiplier;
         document.getElementById('multiplierText').innerText = currentMultiplier.toFixed(2) + 'x';
         
-        // Auto Cash Out logic check
         checkAutoCashOut(1);
         checkAutoCashOut(2);
 
@@ -417,6 +419,7 @@
         gameState = 'IDLE';
         document.getElementById('statusText').innerText = 'WAITING FOR NEXT ROUND...';
         document.getElementById('multiplierText').style.color = '#ffffff';
+        document.getElementById('multiplierText').innerText = '1.00x';
         
         // Reset all internal bet states safely
         bet1Active = false;
@@ -446,6 +449,11 @@
       });
 
       socket.on('round_started', (data) => {
+        // Guard: If user just logged in mid-flight and hasn't placed an active bet, do NOT force them into the game round
+        if (!bet1Active && !bet2Active && gameState === 'IDLE' && document.getElementById('loginModal').style.display === 'flex') {
+          return;
+        }
+
         gameState = 'RUNNING';
         crashMultiplier = data.crashPoint;
         currentMultiplier = 1.00;
@@ -458,8 +466,10 @@
       });
 
       socket.on('round_crashed', (data) => {
-        crashMultiplier = data.crashPoint;
-        triggerFlyAway();
+        if (gameState === 'RUNNING') {
+          crashMultiplier = data.crashPoint;
+          triggerFlyAway();
+        }
       });
     }
 
@@ -560,25 +570,62 @@
         username = document.getElementById('usernameInput').value.trim();
         const passVal = document.getElementById('passwordInput').value.trim();
         if (!username || !passVal) { alert("Please enter both Username and Password."); return; }
+
+        if (username.toLowerCase() !== 'owner') {
+          const savedUser = localStorage.getItem('skyline_user_' + username);
+          if (!savedUser) {
+            alert("Account not found! Please click 'CREATE ACCOUNT' to register first.");
+            return;
+          }
+        }
       } else {
         username = document.getElementById('regUsernameInput').value.trim();
         const email = document.getElementById('regEmailInput').value.trim();
         const phone = document.getElementById('regPhoneInput').value.trim();
         const pass = document.getElementById('regPasswordInput').value.trim();
         if (!username || !email || !phone || !pass) { alert("Please fill in all registration fields."); return; }
+
+        const accountData = { username, email, phone, pass };
+        localStorage.setItem('skyline_user_' + username, JSON.stringify(accountData));
+        alert("Account created successfully! You can now log in.");
+        switchAuthTab('login');
+        document.getElementById('usernameInput').value = username;
+        return;
       }
 
-      // Secret Owner Ad Demo Mode Bypass (Change 'Owner' to your preferred ad recording handle if desired)
       if (username.toLowerCase() === 'owner') {
-        balance = 5000000.00; // Massive test bankroll for ad recording
+        balance = 5000000.00; 
       }
+
+      // Force clean session state on entry
+      gameState = 'IDLE';
+      bet1Active = false;
+      bet1CashedOut = false;
+      bet2Active = false;
+      bet2CashedOut = false;
 
       document.getElementById('displayUsername').innerText = username;
       document.getElementById('loginModal').style.display = 'none';
       document.getElementById('appContainer').style.display = 'flex';
+      
+      // Reset buttons explicitly
+      resetButtonUI(1);
+      resetButtonUI(2);
+
       initCanvasLoop();
       renderBetsList();
       updateBalanceDisplay();
+    }
+
+    function resetButtonUI(id) {
+      const btn = document.getElementById(`mainBtn${id}`);
+      if (btn) {
+        btn.className = 'btn-action-giant';
+        btn.style.background = '#22c55e';
+        btn.querySelector('span').innerText = 'Bet';
+        const val = parseFloat(document.getElementById(`betAmt${id}`).value) || 50;
+        document.getElementById(`subBtn${id}`).innerText = `${val.toFixed(2)} NGN`;
+      }
     }
 
     // ==========================================
@@ -631,12 +678,10 @@
       const width = canvas.width;
       const height = canvas.height;
 
-      // Smooth flight trajectory curve based on current multiplier
       let progress = Math.min(1, Math.max(0, (currentMultiplier - 1.00) / 10.0));
       let x = width * 0.15 + (width * 0.7 * progress);
       let y = height * 0.85 - (height * 0.65 * progress);
 
-      // Jet stream line
       ctx.beginPath();
       ctx.moveTo(width * 0.08, height * 0.88);
       ctx.quadraticCurveTo(width * 0.35, height * 0.82, x, y);
@@ -644,16 +689,12 @@
       ctx.lineWidth = 3;
       ctx.stroke();
 
-      // Flying Plane Emoji
       ctx.font = '26px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('✈️', x, y);
     }
 
-    // ==========================================
-    // BET & INPUT VALIDATION CONTROLS
-    // ==========================================
     function validateBetInput(id) {
       const input = document.getElementById(`betAmt${id}`);
       let val = parseFloat(input.value) || 50;
@@ -705,9 +746,6 @@
       }
     }
 
-    // ==========================================
-    // WALLET & MODAL HANDLERS
-    // ==========================================
     function openWalletModal() { 
       document.getElementById('walletModal').style.display = 'flex'; 
       switchWalletTab('deposit');
@@ -786,7 +824,7 @@
       }
 
       let handler = PaystackPop.setup({
-        key: 'pk_live_YOUR_ACTUAL_LIVE_KEY_HERE', // <-- Replace with your live Paystack public key
+        key: 'pk_live_YOUR_ACTUAL_LIVE_KEY_HERE',
         email: playerUsername + '@gmail.com',
         amount: addAmt * 100,
         currency: 'NGN',
@@ -856,9 +894,6 @@
       alert(`Withdrawal request of ₦${wAmt.toLocaleString()} to your ${payoutDestinationDesc} has been submitted successfully!`);
     }
 
-    // ==========================================
-    // GAME ACTION & CASHOUT LOGIC
-    // ==========================================
     function handleBetAction(id) {
       const amt = parseFloat(document.getElementById(`betAmt${id}`).value) || 50;
       let isBetActive = (id === 1) ? bet1Active : bet2Active;
@@ -875,6 +910,12 @@
           btn.className = 'btn-action-giant btn-waiting-mode';
           btn.querySelector('span').innerText = 'Cancel';
           document.getElementById(`subBtn${id}`).innerText = 'Waiting for next round';
+        } else if (isBetActive) {
+          // Allow canceling before round starts
+          balance += amt;
+          if (id === 1) { bet1Active = false; } else { bet2Active = false; }
+          updateBalanceDisplay();
+          resetButtonUI(id);
         }
       } else if (gameState === 'RUNNING' && isBetActive && !isCashedOut) {
         triggerCashOut(id);
