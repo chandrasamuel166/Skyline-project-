@@ -163,7 +163,7 @@
           <div class="avatar-circle" style="background:#10b981;">🐯</div>
           <div class="avatar-circle" style="background:#3b82f6;">🦁</div>
         </div>
-        <span class="player-count-text" id="activePlayerCount">1,850</span>
+        <span class="player-count-text" id="activePlayerCount">3,450</span>
       </div>
     </div>
 
@@ -375,29 +375,44 @@
     });
 
     // ==========================================
-    // CONTINUOUS UNBROKEN HIGH-TRAFFIC PLAYER CYCLE
+    // TRUE REALISTIC FLIGHT & LOBBY PLAYER CYCLE
     // ==========================================
-    let currentLivePlayerCount = 2450;
+    let currentLivePlayerCount = 4250;
     let playerTickerInterval = null;
 
     function startBettingPhaseTraffic() {
       if (playerTickerInterval) clearInterval(playerTickerInterval);
+      
+      // Random lobby starting population between 2,800 and 6,500
+      currentLivePlayerCount = Math.floor(Math.random() * 3700) + 2800;
+      updatePlayerCountDisplay();
+
+      // Lobby fluctuation: joins and leaves naturally before flight starts
       playerTickerInterval = setInterval(() => {
-        let jump = Math.floor(Math.random() * 350) + 120;
-        currentLivePlayerCount += jump;
-        if (currentLivePlayerCount > 7800) {
-          currentLivePlayerCount = 4200; // Keeps it smoothly rolling without resetting down to 1 or small numbers
-        }
+        if (gameState !== 'IDLE') return;
+        let delta = Math.floor(Math.random() * 400) - 180;
+        currentLivePlayerCount += delta;
+        if (currentLivePlayerCount > 7900) currentLivePlayerCount = 6100;
+        if (currentLivePlayerCount < 2100) currentLivePlayerCount = 3400;
         updatePlayerCountDisplay();
-      }, 600);
+      }, 750);
     }
 
     function startFlightPhaseTraffic() {
       if (playerTickerInterval) clearInterval(playerTickerInterval);
+      
+      // Active flight phase: smoothly ticks down as players cash out, 
+      // capable of going down to any realistic remaining number (42, 25, 12, 5, etc.) right up until crash
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'RUNNING') return;
-        let drop = Math.floor(Math.random() * 300) + 120;
-        currentLivePlayerCount = Math.max(900, currentLivePlayerCount - drop);
+        
+        let dropStep = Math.floor(Math.random() * 300) + 80;
+        currentLivePlayerCount -= dropStep;
+        
+        // Allows counting down all the way to low single/double digits naturally before round ends
+        if (currentLivePlayerCount < 4) {
+          currentLivePlayerCount = 3; 
+        }
         updatePlayerCountDisplay();
       }, 700);
     }
@@ -543,7 +558,7 @@
     let bet2CashedOut = false;
 
     // ==========================================
-    // CLEAN AUDIO SYNTHESIZER (BOOSTED CRASH VOLUME)
+    // AUDIO SYNTHESIZER (BOOSTED LOUD CRASH & WIN)
     // ==========================================
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     let audioCtx = null;
@@ -571,15 +586,14 @@
         osc.type = 'sine';
         osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(783.99, audioCtx.currentTime + 0.25);
-        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.3);
         osc.start(); osc.stop(audioCtx.currentTime + 0.3);
       } else if (type === 'crash') {
-        // Boosted volume and impact frequency for loud 'flew away' sound
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(160, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(180, audioCtx.currentTime);
         osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 0.5);
-        gain.gain.setValueAtTime(0.35, audioCtx.currentTime); 
+        gain.gain.setValueAtTime(0.4, audioCtx.currentTime); 
         gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5);
         osc.start(); osc.stop(audioCtx.currentTime + 0.5);
       }
