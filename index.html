@@ -113,8 +113,8 @@
 
       <!-- LOGIN PANE -->
       <div class="auth-pane active" id="paneLogin">
-        <input type="text" id="usernameInput" class="login-input" placeholder="Username" value="Player1" />
-        <input type="password" id="passwordInput" class="login-input" placeholder="Password" value="123456" />
+        <input type="text" id="usernameInput" class="login-input" placeholder="Username" />
+        <input type="password" id="passwordInput" class="login-input" placeholder="Password" />
         <button class="btn-enter-game" onclick="enterGameAsPlayer('login')">LOGIN & PLAY</button>
       </div>
 
@@ -568,11 +568,17 @@
         if (!username || !email || !phone || !pass) { alert("Please fill in all registration fields."); return; }
       }
 
+      // Secret Owner Ad Demo Mode Bypass (Change 'Owner' to your preferred ad recording handle if desired)
+      if (username.toLowerCase() === 'owner') {
+        balance = 5000000.00; // Massive test bankroll for ad recording
+      }
+
       document.getElementById('displayUsername').innerText = username;
       document.getElementById('loginModal').style.display = 'none';
       document.getElementById('appContainer').style.display = 'flex';
       initCanvasLoop();
       renderBetsList();
+      updateBalanceDisplay();
     }
 
     // ==========================================
@@ -780,7 +786,7 @@
       }
 
       let handler = PaystackPop.setup({
-        key: 'pk_test_d3678d70ea2ef0738517edd3ed13e844860ff3c8',
+        key: 'pk_live_YOUR_ACTUAL_LIVE_KEY_HERE', // <-- Replace with your live Paystack public key
         email: playerUsername + '@gmail.com',
         amount: addAmt * 100,
         currency: 'NGN',
@@ -950,4 +956,3 @@
   </script>
 </body>
 </html>
-
