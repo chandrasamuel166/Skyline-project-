@@ -446,7 +446,9 @@
       renderBetsList();
     }
 
-    // Initialize socket connection safely with strict state guards
+    // ==========================================
+    // UNSTUCK SOCKET EVENT LISTENERS
+    // ==========================================
     if (typeof io !== 'undefined') {
       socket = io('https://skyline-project.onrender.com');
 
@@ -459,7 +461,7 @@
       });
 
       socket.on('multiplier_update', (data) => {
-        if (gameState === 'IDLE') return;
+        if (gameState !== 'RUNNING') return;
 
         currentMultiplier = data.currentMultiplier;
         document.getElementById('multiplierText').innerText = currentMultiplier.toFixed(2) + 'x';
@@ -467,8 +469,6 @@
         checkAutoCashOut(1);
         checkAutoCashOut(2);
         updateSimulatedPlayersProgress();
-
-        // Update authentic Aviator smooth pitch sweep frequency continuously while running
         updateFlightEngineAudio(currentMultiplier);
 
         if (bet1Active && !bet1CashedOut) {
@@ -482,7 +482,7 @@
       socket.on('round_idle', (data) => {
         gameState = 'IDLE';
         resetFlightEngineToIdle();
-        startBettingPhaseTraffic(); // Switch player count to count UP while betting
+        startBettingPhaseTraffic(); // Counts UP while waiting in lobby
 
         document.getElementById('statusText').innerText = 'WAITING FOR NEXT ROUND...';
         document.getElementById('multiplierText').style.color = '#ffffff';
@@ -494,37 +494,17 @@
         bet2CashedOut = false;
 
         resetSimulatedPlayers();
-
-        const btn1 = document.getElementById('mainBtn1');
-        if(btn1) {
-          btn1.className = 'btn-action-giant';
-          btn1.style.background = '#22c55e';
-          btn1.querySelector('span').innerText = 'Bet';
-          const val1 = parseFloat(document.getElementById('betAmt1').value) || 50;
-          document.getElementById('subBtn1').innerText = `${val1.toFixed(2)} NGN`;
-        }
-
-        const btn2 = document.getElementById('mainBtn2');
-        if(btn2) {
-          btn2.className = 'btn-action-giant';
-          btn2.style.background = '#22c55e';
-          btn2.querySelector('span').innerText = 'Bet';
-          const val2 = parseFloat(document.getElementById('betAmt2').value) || 50;
-          document.getElementById('subBtn2').innerText = `${val2.toFixed(2)} NGN`;
-        }
+        resetButtonUI(1);
+        resetButtonUI(2);
       });
 
       socket.on('round_started', (data) => {
-        if (!bet1Active && !bet2Active && gameState === 'IDLE' && document.getElementById('loginModal').style.display === 'flex') {
-          return;
-        }
-
         gameState = 'RUNNING';
         crashMultiplier = data.crashPoint;
         currentMultiplier = 1.00;
         
         resetSimulatedPlayers();
-        startFlightPhaseTraffic(); // Switch player count to count DOWN as players cash out
+        startFlightPhaseTraffic(); // Counts DOWN as flight runs
 
         document.getElementById('statusText').innerText = ''; 
         document.getElementById('multiplierText').style.color = '#ffffff';
