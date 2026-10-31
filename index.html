@@ -163,7 +163,7 @@
           <div class="avatar-circle" style="background:#10b981;">🐯</div>
           <div class="avatar-circle" style="background:#3b82f6;">🦁</div>
         </div>
-        <span class="player-count-text" id="activePlayerCount">3,450</span>
+        <span class="player-count-text" id="activePlayerCount">1</span>
       </div>
     </div>
 
@@ -338,7 +338,7 @@
       <p style="font-size:0.75rem; color:#8e8e93; margin-bottom:12px; text-align:left;">Skyline uses cryptographic algorithms to ensure 100% random and tamper-proof flight crash points.</p>
       
       <label class="form-label">Server Seed Hash (SHA-256)</label>
-      <input type="text" class="login-input" value="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" readonly style="font-size:0.7rem; color:#38bdf8;" />
+      <input type="text" class="login-input" value="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" readonly style="font-size:0.70rem; color:#38bdf8;" />
 
       <label class="form-label">Current Round Status</label>
       <input type="text" class="login-input" value="Verified Secure & Encrypted" readonly style="font-size:0.8rem; color:#22c55e;" />
@@ -375,20 +375,23 @@
     });
 
     // ==========================================
-    // REALISTIC LIVE TRAFFIC CYCLE (COUNT UP/DOWN)
+    // FRESH 1-UPWARDS & DOWNWARD TRAFFIC CYCLE
     // ==========================================
-    let currentLivePlayerCount = 3450;
+    let currentLivePlayerCount = 1; // Starts fresh at 1 every new betting round
     let playerTickerInterval = null;
 
-    // Counts UP during betting/waiting phase as players join
+    // Counts UP from 1 upwards during betting/waiting lobby phase
     function startBettingPhaseTraffic() {
+      currentLivePlayerCount = 1; // Reset to 1 fresh at the start of every betting lobby
+      updatePlayerCountDisplay();
+
       if (playerTickerInterval) clearInterval(playerTickerInterval);
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'IDLE') return;
-        let increase = Math.floor(Math.random() * 90) + 25;
+        let increase = Math.floor(Math.random() * 80) + 25;
         currentLivePlayerCount += increase;
         updatePlayerCountDisplay();
-      }, 1400);
+      }, 1200);
     }
 
     // Counts DOWN during flight phase as players cash out and leave
@@ -396,8 +399,8 @@
       if (playerTickerInterval) clearInterval(playerTickerInterval);
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'RUNNING') return;
-        let decrease = Math.floor(Math.random() * 140) + 50;
-        currentLivePlayerCount = Math.max(750, currentLivePlayerCount - decrease);
+        let decrease = Math.floor(Math.random() * 90) + 30;
+        currentLivePlayerCount = Math.max(120, currentLivePlayerCount - decrease);
         updatePlayerCountDisplay();
       }, 1000);
     }
@@ -469,7 +472,7 @@
         checkAutoCashOut(1);
         checkAutoCashOut(2);
         updateSimulatedPlayersProgress();
-        updateFlightEngineAudio(currentMultiplier);
+        updateMelodyTunePitch(currentMultiplier);
 
         if (bet1Active && !bet1CashedOut) {
           document.getElementById('subBtn1').innerText = `${(bet1Amount * currentMultiplier).toFixed(2)} NGN`;
@@ -481,8 +484,8 @@
 
       socket.on('round_idle', (data) => {
         gameState = 'IDLE';
-        resetFlightEngineToIdle();
-        startBettingPhaseTraffic(); // Counts UP while waiting in lobby
+        resetMelodyTuneToIdle();
+        startBettingPhaseTraffic(); // Resets to 1 and counts UP fresh
 
         document.getElementById('statusText').innerText = 'WAITING FOR NEXT ROUND...';
         document.getElementById('multiplierText').style.color = '#ffffff';
@@ -544,61 +547,66 @@
     let bet2Amount = 50;
     let bet2CashedOut = false;
 
-    // Authentic Aviator Clean Pitch Sweep Audio Synthesizer
+    // ==========================================
+    // MUSICAL PIANO / MELODY TUNE SYNTHESIZER
+    // ==========================================
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     const audioCtx = AudioContextClass ? new AudioContextClass() : null;
-    let flightOscillator = null;
-    let flightGainNode = null;
+    let melodyOscillator = null;
+    let melodyGainNode = null;
 
-    function startPersistentAmbientAudio() {
+    function startMusicalMelodyTune() {
       if (!soundEnabled || !audioCtx) return;
       if (audioCtx.state === 'suspended') audioCtx.resume();
       
       try {
-        if (flightOscillator) return;
+        if (melodyOscillator) return;
         
-        flightOscillator = audioCtx.createOscillator();
-        flightGainNode = audioCtx.createGain();
+        melodyOscillator = audioCtx.createOscillator();
+        melodyGainNode = audioCtx.createGain();
 
-        flightOscillator.type = 'sine';
-        flightOscillator.frequency.setValueAtTime(200, audioCtx.currentTime); 
+        // Sine wave gives a clean, soothing piano / music box harp vibe instead of engine noise
+        melodyOscillator.type = 'sine';
+        melodyOscillator.frequency.setValueAtTime(440, audioCtx.currentTime); 
         
-        flightGainNode.gain.setValueAtTime(0.018, audioCtx.currentTime);
+        melodyGainNode.gain.setValueAtTime(0.015, audioCtx.currentTime); 
         
-        flightOscillator.connect(flightGainNode);
-        flightGainNode.connect(audioCtx.destination);
+        melodyOscillator.connect(melodyGainNode);
+        melodyGainNode.connect(audioCtx.destination);
         
-        flightOscillator.start();
+        melodyOscillator.start();
       } catch (e) {
         console.error("Audio error:", e);
       }
     }
 
-    function updateFlightEngineAudio(multiplier) {
-      if (!soundEnabled || !audioCtx || !flightOscillator) return;
+    function updateMelodyTunePitch(multiplier) {
+      if (!soundEnabled || !audioCtx || !melodyOscillator) return;
       try {
-        let targetFreq = Math.min(520, 200 + (multiplier * 35));
-        flightOscillator.frequency.setTargetAtTime(targetFreq, audioCtx.currentTime, 0.1);
+        let musicalNotes = [440, 493.88, 523.25, 587.33, 659.25, 698.46, 783.99, 880];
+        let noteIndex = Math.min(musicalNotes.length - 1, Math.floor(multiplier) - 1);
+        let targetFreq = musicalNotes[Math.max(0, noteIndex)];
+        melodyOscillator.frequency.setTargetAtTime(targetFreq, audioCtx.currentTime, 0.15);
       } catch(e) {}
     }
 
-    function resetFlightEngineToIdle() {
-      if (!soundEnabled || !audioCtx || !flightOscillator) return;
+    function resetMelodyTuneToIdle() {
+      if (!soundEnabled || !audioCtx || !melodyOscillator) return;
       try {
-        flightOscillator.frequency.setTargetAtTime(200, audioCtx.currentTime, 0.2);
+        melodyOscillator.frequency.setTargetAtTime(440, audioCtx.currentTime, 0.2);
       } catch(e) {}
     }
 
-    function stopPersistentAmbientAudio() {
+    function stopMusicalMelodyTune() {
       try {
-        if (flightOscillator) {
-          flightOscillator.stop();
-          flightOscillator.disconnect();
-          flightOscillator = null;
+        if (melodyOscillator) {
+          melodyOscillator.stop();
+          melodyOscillator.disconnect();
+          melodyOscillator = null;
         }
-        if (flightGainNode) {
-          flightGainNode.disconnect();
-          flightGainNode = null;
+        if (melodyGainNode) {
+          melodyGainNode.disconnect();
+          melodyGainNode = null;
         }
       } catch(e) {}
     }
@@ -613,18 +621,19 @@
       gain.connect(audioCtx.destination);
       
       if (type === 'win') {
+        osc.type = 'sine';
         osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.25);
       } else if (type === 'crash') {
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-        osc.frequency.linearRampToValueAtTime(30, audioCtx.currentTime + 0.4);
-        gain.gain.setValueAtTime(0.22, audioCtx.currentTime); 
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(60, audioCtx.currentTime + 0.35);
+        gain.gain.setValueAtTime(0.18, audioCtx.currentTime); 
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.35);
       }
     }
 
@@ -632,9 +641,9 @@
       soundEnabled = !soundEnabled;
       document.getElementById('soundToggleBtn').innerText = soundEnabled ? '🔊' : '🔇';
       if (!soundEnabled) {
-        stopPersistentAmbientAudio();
+        stopMusicalMelodyTune();
       } else {
-        startPersistentAmbientAudio();
+        startMusicalMelodyTune();
       }
     }
 
@@ -711,7 +720,7 @@
       resetSimulatedPlayers();
       updateBalanceDisplay();
       
-      startPersistentAmbientAudio();
+      startMusicalMelodyTune();
       startBettingPhaseTraffic();
     }
 
