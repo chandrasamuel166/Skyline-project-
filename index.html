@@ -174,7 +174,7 @@
           <div class="left-inputs">
             <div class="amount-stepper">
               <button class="step-btn" onclick="adjustAmount(1, -50)">-</button>
-              <input type="number" id="betAmt1" class="amount-input" value="50" />
+              <input type="number" id="betAmt1" class="amount-input" value="50" oninput="validateBetInput(1)" />
               <button class="step-btn" onclick="adjustAmount(1, 50)">+</button>
             </div>
             <div class="quick-preset-grid">
@@ -185,7 +185,7 @@
             </div>
             <div class="auto-cash-row">
               <span>Auto Cash Out</span>
-              <input type="number" id="autoCash1" class="auto-cash-input" placeholder="2.00" step="0.1" min="1.01" />
+              <input type="number" id="autoCash1" class="auto-cash-input" placeholder="2.00" step="0.1" min="1.01" max="1000" />
             </div>
           </div>
           <button id="mainBtn1" class="btn-action-giant" onclick="handleBetAction(1)">
@@ -201,7 +201,7 @@
           <div class="left-inputs">
             <div class="amount-stepper">
               <button class="step-btn" onclick="adjustAmount(2, -50)">-</button>
-              <input type="number" id="betAmt2" class="amount-input" value="50" />
+              <input type="number" id="betAmt2" class="amount-input" value="50" oninput="validateBetInput(2)" />
               <button class="step-btn" onclick="adjustAmount(2, 50)">+</button>
             </div>
             <div class="quick-preset-grid">
@@ -212,7 +212,7 @@
             </div>
             <div class="auto-cash-row">
               <span>Auto Cash Out</span>
-              <input type="number" id="autoCash2" class="auto-cash-input" placeholder="2.00" step="0.1" min="1.01" />
+              <input type="number" id="autoCash2" class="auto-cash-input" placeholder="2.00" step="0.1" min="1.01" max="1000" />
             </div>
           </div>
           <button id="mainBtn2" class="btn-action-giant" onclick="handleBetAction(2)">
@@ -352,8 +352,38 @@
     // GLOBAL SOCKET & BACKEND CONNECTION
     // ==========================================
     let socket;
+    let canvas, ctx;
+    let animationFrameId;
 
- setTimeout(() => { document.querySelectorAll('[id*="splash"], [class*="splash"]').forEach(el => el.style.display = 'none'); document.getElementById('loginModal').style.display = 'flex'; }, 1500);
+    // Splash Loader Window Sync
+    window.addEventListener('load', () => {
+      let fill = document.getElementById('splashFill');
+      let w = 0;
+      let interval = setInterval(() => {
+        w += 10;
+        if (fill) fill.style.width = w + '%';
+        if (w >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            const splash = document.getElementById('splashScreen');
+            if (splash) splash.style.display = 'none';
+            const login = document.getElementById('loginModal');
+            if (login) login.style.display = 'flex';
+          }, 250);
+        }
+      }, 70);
+    });
+
+    // Dynamic Live Player Counter Ticker
+    setInterval(() => {
+      const countEl = document.getElementById('activePlayerCount');
+      if (countEl) {
+        let current = parseInt(countEl.innerText.replace(/,/g, '')) || 5007;
+        let change = Math.floor(Math.random() * 9) - 4; // -4 to +4
+        current = Math.max(4900, current + change);
+        countEl.innerText = current.toLocaleString();
+      }
+    }, 3500);
 
     // Initialize socket connection safely
     if (typeof io !== 'undefined') {
@@ -371,6 +401,10 @@
         currentMultiplier = data.currentMultiplier;
         document.getElementById('multiplierText').innerText = currentMultiplier.toFixed(2) + 'x';
         
+        // Auto Cash Out logic check
+        checkAutoCashOut(1);
+        checkAutoCashOut(2);
+
         if (bet1Active && !bet1CashedOut) {
           document.getElementById('subBtn1').innerText = `${(bet1Amount * currentMultiplier).toFixed(2)} NGN`;
         }
@@ -384,21 +418,30 @@
         document.getElementById('statusText').innerText = 'WAITING FOR NEXT ROUND...';
         document.getElementById('multiplierText').style.color = '#ffffff';
         
-        if (!bet1Active) {
-          const btn1 = document.getElementById('mainBtn1');
-          if(btn1) {
-            btn1.className = 'btn-action-giant';
-            btn1.style.background = '#22c55e';
-            btn1.querySelector('span').innerText = 'Bet';
-          }
+        // Reset all internal bet states safely
+        bet1Active = false;
+        bet1CashedOut = false;
+        bet2Active = false;
+        bet2CashedOut = false;
+
+        // Reset Button 1 back to green Bet mode
+        const btn1 = document.getElementById('mainBtn1');
+        if(btn1) {
+          btn1.className = 'btn-action-giant';
+          btn1.style.background = '#22c55e';
+          btn1.querySelector('span').innerText = 'Bet';
+          const val1 = parseFloat(document.getElementById('betAmt1').value) || 50;
+          document.getElementById('subBtn1').innerText = `${val1.toFixed(2)} NGN`;
         }
-        if (!bet2Active) {
-          const btn2 = document.getElementById('mainBtn2');
-          if(btn2) {
-            btn2.className = 'btn-action-giant';
-            btn2.style.background = '#22c55e';
-            btn2.querySelector('span').innerText = 'Bet';
-          }
+
+        // Reset Button 2 back to green Bet mode
+        const btn2 = document.getElementById('mainBtn2');
+        if(btn2) {
+          btn2.className = 'btn-action-giant';
+          btn2.style.background = '#22c55e';
+          btn2.querySelector('span').innerText = 'Bet';
+          const val2 = parseFloat(document.getElementById('betAmt2').value) || 50;
+          document.getElementById('subBtn2').innerText = `${val2.toFixed(2)} NGN`;
         }
       });
 
@@ -528,37 +571,137 @@
       document.getElementById('displayUsername').innerText = username;
       document.getElementById('loginModal').style.display = 'none';
       document.getElementById('appContainer').style.display = 'flex';
-      resizeCanvas();
+      initCanvasLoop();
       renderBetsList();
     }
 
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas ? canvas.getContext('2d') : null;
+    // ==========================================
+    // CANVAS & FLIGHT ANIMATION RENDER LOOP
+    // ==========================================
+    function initCanvasLoop() {
+      canvas = document.getElementById('gameCanvas');
+      if (!canvas) return;
+      ctx = canvas.getContext('2d');
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+      
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      renderGameLoop();
+    }
 
     function resizeCanvas() {
       if (!canvas) return;
       canvas.width = canvas.parentElement.clientWidth;
       canvas.height = canvas.parentElement.clientHeight;
-      drawBackgroundRays();
+    }
+
+    function renderGameLoop() {
+      if (!ctx || !canvas) return;
+      
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawBackgroundRays(gameState === 'FLYING_AWAY');
+
+      if (gameState === 'RUNNING' || gameState === 'FLYING_AWAY') {
+        drawPlaneGraphic();
+      }
+
+      animationFrameId = requestAnimationFrame(renderGameLoop);
+    }
+
+    function drawBackgroundRays(isRed = false) {
+      if (!ctx || !canvas) return;
+      const cx = 0, cy = canvas.height, numRays = 16, angleStep = (Math.PI / 2) / numRays;
+      ctx.fillStyle = isRed ? '#180608' : '#030712';
+      for (let i = 0; i < numRays; i += 2) {
+        ctx.beginPath(); ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, Math.max(canvas.width, canvas.height) * 1.5, i * angleStep, (i + 1) * angleStep);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+
+    function drawPlaneGraphic() {
+      if (!ctx || !canvas) return;
+      
+      const width = canvas.width;
+      const height = canvas.height;
+
+      // Smooth flight trajectory curve based on current multiplier
+      let progress = Math.min(1, Math.max(0, (currentMultiplier - 1.00) / 10.0));
+      let x = width * 0.15 + (width * 0.7 * progress);
+      let y = height * 0.85 - (height * 0.65 * progress);
+
+      // Jet stream line
+      ctx.beginPath();
+      ctx.moveTo(width * 0.08, height * 0.88);
+      ctx.quadraticCurveTo(width * 0.35, height * 0.82, x, y);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Flying Plane Emoji
+      ctx.font = '26px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('✈️', x, y);
+    }
+
+    // ==========================================
+    // BET & INPUT VALIDATION CONTROLS
+    // ==========================================
+    function validateBetInput(id) {
+      const input = document.getElementById(`betAmt${id}`);
+      let val = parseFloat(input.value) || 50;
+      if (val < 10) val = 10;
+      let active = (id === 1) ? bet1Active : bet2Active;
+      if (!active) {
+        const sub = document.getElementById(`subBtn${id}`);
+        if (sub) sub.innerText = `${val.toFixed(2)} NGN`;
+      }
     }
 
     function adjustAmount(id, delta) {
       const input = document.getElementById(`betAmt${id}`);
-      let val = Math.max(50, (parseFloat(input.value) || 0) + delta);
+      if (!input) return;
+      let val = Math.max(50, (parseFloat(input.value) || 50) + delta);
       input.value = val;
       let active = (id === 1) ? bet1Active : bet2Active;
-      if (!active) document.getElementById(`subBtn${id}`).innerText = `${val.toFixed(2)} NGN`;
+      if (!active) {
+        const sub = document.getElementById(`subBtn${id}`);
+        if (sub) sub.innerText = `${val.toFixed(2)} NGN`;
+      }
     }
 
     function addPreset(id, val) {
       const input = document.getElementById(`betAmt${id}`);
-      let currentVal = parseFloat(input.value) || 0;
+      if (!input) return;
+      let currentVal = parseFloat(input.value) || 50;
       let newVal = currentVal + val;
       input.value = newVal;
       let active = (id === 1) ? bet1Active : bet2Active;
-      if (!active) document.getElementById(`subBtn${id}`).innerText = `${newVal.toFixed(2)} NGN`;
+      if (!active) {
+        const sub = document.getElementById(`subBtn${id}`);
+        if (sub) sub.innerText = `${newVal.toFixed(2)} NGN`;
+      }
     }
 
+    function checkAutoCashOut(id) {
+      const autoInput = document.getElementById(`autoCash${id}`);
+      if (!autoInput || !autoInput.value) return;
+      
+      const targetX = parseFloat(autoInput.value);
+      if (isNaN(targetX) || targetX <= 1.00) return;
+
+      let isBetActive = (id === 1) ? bet1Active : bet2Active;
+      let isCashedOut = (id === 1) ? bet1CashedOut : bet2CashedOut;
+
+      if (gameState === 'RUNNING' && isBetActive && !isCashedOut && currentMultiplier >= targetX) {
+        triggerCashOut(id);
+      }
+    }
+
+    // ==========================================
+    // WALLET & MODAL HANDLERS
+    // ==========================================
     function openWalletModal() { 
       document.getElementById('walletModal').style.display = 'flex'; 
       switchWalletTab('deposit');
@@ -707,6 +850,9 @@
       alert(`Withdrawal request of ₦${wAmt.toLocaleString()} to your ${payoutDestinationDesc} has been submitted successfully!`);
     }
 
+    // ==========================================
+    // GAME ACTION & CASHOUT LOGIC
+    // ==========================================
     function handleBetAction(id) {
       const amt = parseFloat(document.getElementById(`betAmt${id}`).value) || 50;
       let isBetActive = (id === 1) ? bet1Active : bet2Active;
@@ -762,17 +908,6 @@
       document.getElementById(`subBtn${id}`).innerText = 'WAITING';
     }
 
-    function drawBackgroundRays(isRed = false) {
-      if (!ctx || !canvas) return;
-      const cx = 0, cy = canvas.height, numRays = 16, angleStep = (Math.PI / 2) / numRays;
-      ctx.fillStyle = isRed ? '#180608' : '#030712';
-      for (let i = 0; i < numRays; i += 2) {
-        ctx.beginPath(); ctx.moveTo(cx, cy);
-        ctx.arc(cx, cy, Math.max(canvas.width, canvas.height) * 1.5, i * angleStep, (i + 1) * angleStep);
-        ctx.closePath(); ctx.fill();
-      }
-    }
-
     function triggerFlyAway() {
       gameState = 'FLYING_AWAY';
       playSound('crash');
@@ -815,3 +950,4 @@
   </script>
 </body>
 </html>
+
