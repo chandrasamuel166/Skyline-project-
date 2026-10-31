@@ -163,7 +163,7 @@
           <div class="avatar-circle" style="background:#10b981;">🐯</div>
           <div class="avatar-circle" style="background:#3b82f6;">🦁</div>
         </div>
-        <span class="player-count-text" id="activePlayerCount">4,250</span>
+        <span class="player-count-text" id="activePlayerCount">3,450</span>
       </div>
     </div>
 
@@ -375,19 +375,39 @@
     });
 
     // ==========================================
-    // REALISTIC DYNAMIC PLAYER & CASH-OUT SIMULATION
+    // REALISTIC LIVE TRAFFIC CYCLE (COUNT UP/DOWN)
     // ==========================================
-    
-    // Organic traffic wave player counter ticker (fluctuating between 1,200 and 7,800)
-    setInterval(() => {
+    let currentLivePlayerCount = 3450;
+    let playerTickerInterval = null;
+
+    // Counts UP during betting/waiting phase as players join
+    function startBettingPhaseTraffic() {
+      if (playerTickerInterval) clearInterval(playerTickerInterval);
+      playerTickerInterval = setInterval(() => {
+        if (gameState !== 'IDLE') return;
+        let increase = Math.floor(Math.random() * 90) + 25;
+        currentLivePlayerCount += increase;
+        updatePlayerCountDisplay();
+      }, 1400);
+    }
+
+    // Counts DOWN during flight phase as players cash out and leave
+    function startFlightPhaseTraffic() {
+      if (playerTickerInterval) clearInterval(playerTickerInterval);
+      playerTickerInterval = setInterval(() => {
+        if (gameState !== 'RUNNING') return;
+        let decrease = Math.floor(Math.random() * 140) + 50;
+        currentLivePlayerCount = Math.max(750, currentLivePlayerCount - decrease);
+        updatePlayerCountDisplay();
+      }, 1000);
+    }
+
+    function updatePlayerCountDisplay() {
       const countEl = document.getElementById('activePlayerCount');
       if (countEl) {
-        let current = parseInt(countEl.innerText.replace(/,/g, '')) || 4250;
-        let change = Math.floor(Math.random() * 350) - 160; 
-        current = Math.max(1200, Math.min(7800, current + change));
-        countEl.innerText = current.toLocaleString();
+        countEl.innerText = currentLivePlayerCount.toLocaleString();
       }
-    }, 1800);
+    }
 
     let activeSimPlayers = [
       { name: "k***3", bet: 45000, cashed: false, cashX: 0, win: 0, avatar: "🕶️" },
@@ -412,12 +432,10 @@
     function updateSimulatedPlayersProgress() {
       if (gameState !== 'RUNNING') return;
       
-      let remainingCount = 0;
       activeSimPlayers.forEach(p => {
         if (!p.cashed && currentMultiplier >= p.cashX) {
           p.cashed = true; 
         }
-        if (!p.cashed) remainingCount++;
       });
 
       const badgeEl = document.querySelector('.bets-count-badge');
@@ -450,7 +468,7 @@
         checkAutoCashOut(2);
         updateSimulatedPlayersProgress();
 
-        // Update active flight engine pitch frequency continuously while running
+        // Update authentic Aviator smooth pitch sweep frequency continuously while running
         updateFlightEngineAudio(currentMultiplier);
 
         if (bet1Active && !bet1CashedOut) {
@@ -463,8 +481,8 @@
 
       socket.on('round_idle', (data) => {
         gameState = 'IDLE';
-        // When waiting for the next round, reset the ambient tone to idling hum
         resetFlightEngineToIdle();
+        startBettingPhaseTraffic(); // Switch player count to count UP while betting
 
         document.getElementById('statusText').innerText = 'WAITING FOR NEXT ROUND...';
         document.getElementById('multiplierText').style.color = '#ffffff';
@@ -506,6 +524,7 @@
         currentMultiplier = 1.00;
         
         resetSimulatedPlayers();
+        startFlightPhaseTraffic(); // Switch player count to count DOWN as players cash out
 
         document.getElementById('statusText').innerText = ''; 
         document.getElementById('multiplierText').style.color = '#ffffff';
@@ -545,7 +564,7 @@
     let bet2Amount = 50;
     let bet2CashedOut = false;
 
-    // Aviator-style Continuous Ambient Engine Sound Synthesizer variables
+    // Authentic Aviator Clean Pitch Sweep Audio Synthesizer
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     const audioCtx = AudioContextClass ? new AudioContextClass() : null;
     let flightOscillator = null;
@@ -556,17 +575,15 @@
       if (audioCtx.state === 'suspended') audioCtx.resume();
       
       try {
-        if (flightOscillator) return; // Already running
+        if (flightOscillator) return;
         
         flightOscillator = audioCtx.createOscillator();
         flightGainNode = audioCtx.createGain();
 
-        // Use triangle waveform for a warm, smooth ambient engine hum
-        flightOscillator.type = 'triangle';
-        flightOscillator.frequency.setValueAtTime(110, audioCtx.currentTime); // Low idle hum
+        flightOscillator.type = 'sine';
+        flightOscillator.frequency.setValueAtTime(200, audioCtx.currentTime); 
         
-        // Soft background volume so it stays pleasant and never overpowers crash/win
-        flightGainNode.gain.setValueAtTime(0.012, audioCtx.currentTime);
+        flightGainNode.gain.setValueAtTime(0.018, audioCtx.currentTime);
         
         flightOscillator.connect(flightGainNode);
         flightGainNode.connect(audioCtx.destination);
@@ -580,8 +597,7 @@
     function updateFlightEngineAudio(multiplier) {
       if (!soundEnabled || !audioCtx || !flightOscillator) return;
       try {
-        // Pitch rises smoothly as the multiplier climbs during active flight
-        let targetFreq = Math.min(380, 110 + (multiplier * 22));
+        let targetFreq = Math.min(520, 200 + (multiplier * 35));
         flightOscillator.frequency.setTargetAtTime(targetFreq, audioCtx.currentTime, 0.1);
       } catch(e) {}
     }
@@ -589,8 +605,7 @@
     function resetFlightEngineToIdle() {
       if (!soundEnabled || !audioCtx || !flightOscillator) return;
       try {
-        // Drop frequency back down to idle hum when round finishes
-        flightOscillator.frequency.setTargetAtTime(110, audioCtx.currentTime, 0.2);
+        flightOscillator.frequency.setTargetAtTime(200, audioCtx.currentTime, 0.2);
       } catch(e) {}
     }
 
@@ -624,13 +639,12 @@
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
         osc.start(); osc.stop(audioCtx.currentTime + 0.2);
       } else if (type === 'crash') {
-        // Loud, prominent crash explosion sound
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(160, audioCtx.currentTime);
-        osc.frequency.linearRampToValueAtTime(30, audioCtx.currentTime + 0.45);
-        gain.gain.setValueAtTime(0.28, audioCtx.currentTime); 
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.45);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.45);
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(30, audioCtx.currentTime + 0.4);
+        gain.gain.setValueAtTime(0.22, audioCtx.currentTime); 
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.4);
       }
     }
 
@@ -717,8 +731,8 @@
       resetSimulatedPlayers();
       updateBalanceDisplay();
       
-      // Start continuous ambient game audio as soon as player enters the game screen
       startPersistentAmbientAudio();
+      startBettingPhaseTraffic();
     }
 
     function resetButtonUI(id) {
