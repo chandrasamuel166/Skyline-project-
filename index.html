@@ -375,46 +375,38 @@
     });
 
     // ==========================================
-    // TRUE REALISTIC FLIGHT & LOBBY PLAYER CYCLE
+    // UNBROKEN COUNTING LOBBY & FLIGHT PLAYER CYCLE
     // ==========================================
-    let currentLivePlayerCount = 4250;
+    let currentLivePlayerCount = 3450;
     let playerTickerInterval = null;
 
     function startBettingPhaseTraffic() {
       if (playerTickerInterval) clearInterval(playerTickerInterval);
       
-      // Random lobby starting population between 2,800 and 6,500
-      currentLivePlayerCount = Math.floor(Math.random() * 3700) + 2800;
+      // Start lobby count at a realistic baseline
+      currentLivePlayerCount = Math.floor(Math.random() * 2000) + 2500;
       updatePlayerCountDisplay();
 
-      // Lobby fluctuation: joins and leaves naturally before flight starts
+      // Continuous unbroken counting UP during lobby waiting phase
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'IDLE') return;
-        let delta = Math.floor(Math.random() * 400) - 180;
-        currentLivePlayerCount += delta;
-        if (currentLivePlayerCount > 7900) currentLivePlayerCount = 6100;
-        if (currentLivePlayerCount < 2100) currentLivePlayerCount = 3400;
+        currentLivePlayerCount += Math.floor(Math.random() * 3) + 1; // Smoothly counts up continuously
+        if (currentLivePlayerCount > 8500) currentLivePlayerCount = 3100; // Loops naturally if reaching high cap
         updatePlayerCountDisplay();
-      }, 750);
+      }, 400);
     }
 
     function startFlightPhaseTraffic() {
       if (playerTickerInterval) clearInterval(playerTickerInterval);
       
-      // Active flight phase: smoothly ticks down as players cash out, 
-      // capable of going down to any realistic remaining number (42, 25, 12, 5, etc.) right up until crash
+      // Active flight phase: ticks down realistically as players cash out, ending at any dynamic remaining count (e.g. 235, 42, 10)
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'RUNNING') return;
         
-        let dropStep = Math.floor(Math.random() * 300) + 80;
-        currentLivePlayerCount -= dropStep;
-        
-        // Allows counting down all the way to low single/double digits naturally before round ends
-        if (currentLivePlayerCount < 4) {
-          currentLivePlayerCount = 3; 
-        }
+        let dropStep = Math.floor(Math.random() * 4) + 1;
+        currentLivePlayerCount = Math.max(5, currentLivePlayerCount - dropStep);
         updatePlayerCountDisplay();
-      }, 700);
+      }, 350);
     }
 
     function updatePlayerCountDisplay() {
@@ -495,6 +487,7 @@
 
       socket.on('round_idle', (data) => {
         gameState = 'IDLE';
+        stopFlightAmbience();
         startBettingPhaseTraffic();
 
         document.getElementById('statusText').innerText = 'WAITING FOR NEXT ROUND...';
@@ -518,6 +511,7 @@
         
         resetSimulatedPlayers();
         startFlightPhaseTraffic();
+        startFlightAmbience();
 
         document.getElementById('statusText').innerText = ''; 
         document.getElementById('multiplierText').style.color = '#ffffff';
@@ -558,10 +552,11 @@
     let bet2CashedOut = false;
 
     // ==========================================
-    // AUDIO SYNTHESIZER (BOOSTED LOUD CRASH & WIN)
+    // AUDIO SYNTHESIZER (ENJOYABLE FLIGHT MUSIC & LOUD CRASH/WIN)
     // ==========================================
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     let audioCtx = null;
+    let ambienceInterval = null;
 
     function initAudioContext() {
       if (!audioCtx && AudioContextClass) {
@@ -569,6 +564,47 @@
       }
       if (audioCtx && audioCtx.state === 'suspended') {
         audioCtx.resume();
+      }
+    }
+
+    function startFlightAmbience() {
+      if (!soundEnabled) return;
+      initAudioContext();
+      if (!audioCtx) return;
+
+      stopFlightAmbience();
+
+      // Plays an enjoyable, smooth ascending musical chime loop during flight
+      const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99];
+      let noteIndex = 0;
+
+      ambienceInterval = setInterval(() => {
+        if (!soundEnabled || gameState !== 'RUNNING') return;
+        try {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(notes[noteIndex % notes.length], audioCtx.currentTime);
+          
+          gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.35);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.35);
+          noteIndex++;
+        } catch (e) {
+          // ignore audio context restrictions
+        }
+      }, 450);
+    }
+
+    function stopFlightAmbience() {
+      if (ambienceInterval) {
+        clearInterval(ambienceInterval);
+        ambienceInterval = null;
       }
     }
 
@@ -590,6 +626,7 @@
         gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.3);
         osc.start(); osc.stop(audioCtx.currentTime + 0.3);
       } else if (type === 'crash') {
+        // Loud, clear flew away / crash impact sound
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(180, audioCtx.currentTime);
         osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 0.5);
@@ -602,6 +639,11 @@
     function toggleSound() {
       soundEnabled = !soundEnabled;
       document.getElementById('soundToggleBtn').innerText = soundEnabled ? '🔊' : '🔇';
+      if (!soundEnabled) {
+        stopFlightAmbience();
+      } else if (gameState === 'RUNNING') {
+        startFlightAmbience();
+      }
     }
 
     function switchAuthTab(mode) {
@@ -1024,6 +1066,7 @@
 
     function triggerFlyAway() {
       gameState = 'FLYING_AWAY';
+      stopFlightAmbience();
       playSound('crash');
 
       const statusEl = document.getElementById('statusText');
