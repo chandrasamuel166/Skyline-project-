@@ -375,38 +375,46 @@
     });
 
     // ==========================================
-    // UNBROKEN COUNTING LOBBY & FLIGHT PLAYER CYCLE
+    // STRICTLY UNBROKEN UPWARD LOBBY & PROPORTIONAL FLIGHT DECAY
     // ==========================================
-    let currentLivePlayerCount = 3450;
+    let currentLivePlayerCount = 3850;
     let playerTickerInterval = null;
 
     function startBettingPhaseTraffic() {
       if (playerTickerInterval) clearInterval(playerTickerInterval);
       
-      // Start lobby count at a realistic baseline
-      currentLivePlayerCount = Math.floor(Math.random() * 2000) + 2500;
+      // Initialize lobby population between 3,200 and 6,800
+      currentLivePlayerCount = Math.floor(Math.random() * 3600) + 3200;
       updatePlayerCountDisplay();
 
-      // Continuous unbroken counting UP during lobby waiting phase
+      // STRICTLY COUNTS UPWARDS CONTINUOUSLY DURING WAITING PHASE (No jumping down)
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'IDLE') return;
-        currentLivePlayerCount += Math.floor(Math.random() * 3) + 1; // Smoothly counts up continuously
-        if (currentLivePlayerCount > 8500) currentLivePlayerCount = 3100; // Loops naturally if reaching high cap
+        currentLivePlayerCount += Math.floor(Math.random() * 2) + 1; 
+        if (currentLivePlayerCount > 9500) currentLivePlayerCount = 3400; // Smooth reset if reaching high cap
         updatePlayerCountDisplay();
-      }, 400);
+      }, 500);
     }
 
     function startFlightPhaseTraffic() {
       if (playerTickerInterval) clearInterval(playerTickerInterval);
       
-      // Active flight phase: ticks down realistically as players cash out, ending at any dynamic remaining count (e.g. 235, 42, 10)
+      // Proportional slow decay: Stays high when multiplier is low (e.g. 500+, 1000+ players at 20x), 
+      // and scales down gradually so it never drops prematurely or gets stuck at 3.
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'RUNNING') return;
         
-        let dropStep = Math.floor(Math.random() * 4) + 1;
-        currentLivePlayerCount = Math.max(5, currentLivePlayerCount - dropStep);
+        // Decay speed scales inversely with multiplier size so it drops slowly and looks realistic
+        let basePool = 4500;
+        let scaleFactor = Math.min(0.92, (currentMultiplier - 1.0) / 40.0);
+        let calculatedCount = Math.floor(basePool * (1 - scaleFactor));
+        
+        // Add natural micro-fluctuations around the proportional target
+        let noise = Math.floor(Math.random() * 35) - 15;
+        currentLivePlayerCount = Math.max(12, calculatedCount + noise);
+        
         updatePlayerCountDisplay();
-      }, 350);
+      }, 600);
     }
 
     function updatePlayerCountDisplay() {
@@ -552,7 +560,7 @@
     let bet2CashedOut = false;
 
     // ==========================================
-    // AUDIO SYNTHESIZER (ENJOYABLE FLIGHT MUSIC & LOUD CRASH/WIN)
+    // AVIATOR-STYLE AMBIENT FLIGHT SYNTHESIZER
     // ==========================================
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     let audioCtx = null;
@@ -574,31 +582,30 @@
 
       stopFlightAmbience();
 
-      // Plays an enjoyable, smooth ascending musical chime loop during flight
-      const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99];
-      let noteIndex = 0;
+      // Immersive Aviator-style engine hum and ascending pitch chords during flight
+      const chordNotes = [196.00, 246.94, 293.66, 392.00, 440.00];
+      let noteIdx = 0;
 
       ambienceInterval = setInterval(() => {
         if (!soundEnabled || gameState !== 'RUNNING') return;
         try {
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(notes[noteIndex % notes.length], audioCtx.currentTime);
           
-          gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.35);
+          osc.type = 'triangle'; // Richer, warm engine-like timbre close to Aviator
+          osc.frequency.setValueAtTime(chordNotes[noteIdx % chordNotes.length], audioCtx.currentTime);
+          
+          gain.gain.setValueAtTime(0.035, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5);
 
           osc.connect(gain);
           gain.connect(audioCtx.destination);
 
           osc.start();
-          osc.stop(audioCtx.currentTime + 0.35);
-          noteIndex++;
-        } catch (e) {
-          // ignore audio context restrictions
-        }
-      }, 450);
+          osc.stop(audioCtx.currentTime + 0.5);
+          noteIdx++;
+        } catch (e) {}
+      }, 500);
     }
 
     function stopFlightAmbience() {
@@ -626,7 +633,7 @@
         gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.3);
         osc.start(); osc.stop(audioCtx.currentTime + 0.3);
       } else if (type === 'crash') {
-        // Loud, clear flew away / crash impact sound
+        // Loud, clear Aviator-style crash impact sound
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(180, audioCtx.currentTime);
         osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 0.5);
