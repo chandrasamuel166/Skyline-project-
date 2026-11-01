@@ -380,7 +380,7 @@
     });
 
     // ==========================================
-    // STRICT 7-SECOND AVIATOR WAITING TIMER & FLIGHT DECAY
+    // STRICT 7-SECOND WAITING TIMER & 0.0s WATCHDOG FAILSAFE
     // ==========================================
     let currentLivePlayerCount = 4150;
     let playerTickerInterval = null;
@@ -394,7 +394,6 @@
       currentLivePlayerCount = Math.floor(Math.random() * 3500) + 3500;
       updatePlayerCountDisplay();
 
-      // Strict 7-second Aviator waiting timer countdown loop
       remainingWaitSeconds = 7.0;
       const statusEl = document.getElementById('statusText');
 
@@ -407,15 +406,14 @@
         remainingWaitSeconds -= 0.1;
         if (remainingWaitSeconds <= 0) {
           remainingWaitSeconds = 0.0;
-          clearInterval(waitingCountdownTimer);
-        }
-
-        if (statusEl) {
-          statusEl.innerText = `NEXT ROUND IN ${remainingWaitSeconds.toFixed(1)}s`;
+          if (statusEl) statusEl.innerText = `WAITING FOR SERVER...`;
+        } else {
+          if (statusEl) {
+            statusEl.innerText = `NEXT ROUND IN ${remainingWaitSeconds.toFixed(1)}s`;
+          }
         }
       }, 100);
 
-      // Lobby count increments upward continuously
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'IDLE') return;
         currentLivePlayerCount += Math.floor(Math.random() * 2) + 1; 
@@ -449,6 +447,9 @@
       }
     }
 
+    // ==========================================
+    // ROLLING INFINITE SCALING SIMULATED PLAYERS (2000x - 4000x+ Safe)
+    // ==========================================
     let activeSimPlayers = [
       { name: "k***3", bet: 45000, cashed: false, cashX: 0, win: 0, avatar: "🕶️" },
       { name: "9***9", bet: 12500, cashed: false, cashX: 0, win: 0, avatar: "🐯" },
@@ -463,7 +464,15 @@
     function resetSimulatedPlayers() {
       activeSimPlayers.forEach(p => {
         p.cashed = false;
-        p.cashX = parseFloat((1.12 + Math.random() * 4.8).toFixed(2));
+        // Generate targets across wide tiers so table never freezes at high multipliers
+        let roll = Math.random();
+        if (roll < 0.4) {
+          p.cashX = parseFloat((1.2 + Math.random() * 25.0).toFixed(2));
+        } else if (roll < 0.8) {
+          p.cashX = parseFloat((30.0 + Math.random() * 350.0).toFixed(2));
+        } else {
+          p.cashX = parseFloat((400.0 + Math.random() * 3500.0).toFixed(2));
+        }
         p.win = p.bet * p.cashX;
       });
       renderBetsList();
@@ -475,6 +484,11 @@
       activeSimPlayers.forEach(p => {
         if (!p.cashed && currentMultiplier >= p.cashX) {
           p.cashed = true; 
+        } else if (p.cashed && currentMultiplier > p.cashX) {
+          // CONTINUOUS ROLLING RE-CYCLE: Keeps generating higher targets as multiplier climbs past 2000x / 4000x
+          p.cashed = false;
+          p.cashX = parseFloat((currentMultiplier + 20 + Math.random() * 2000).toFixed(2));
+          p.win = p.bet * p.cashX;
         }
       });
 
@@ -487,7 +501,7 @@
     }
 
     // ==========================================
-    // UNSTUCK SOCKET EVENT LISTENERS & HARD RESET
+    // SOCKET LISTENERS & CLEAN LOBBY RESET
     // ==========================================
     function initSocketConnection() {
       if (typeof io === 'undefined') return;
@@ -559,14 +573,15 @@
       document.getElementById('multiplierText').style.color = '#ffffff';
       document.getElementById('multiplierText').innerText = '1.00x';
       
+      // Cleanly wipe out bets when new game starts
       bet1Active = false;
       bet1CashedOut = false;
       bet2Active = false;
       bet2CashedOut = false;
-
-      resetSimulatedPlayers();
       resetButtonUI(1);
       resetButtonUI(2);
+
+      resetSimulatedPlayers();
     }
 
     initSocketConnection();
@@ -595,7 +610,7 @@
     let bet2CashedOut = false;
 
     // ==========================================
-    // AVIATOR-STYLE AMBIENT FLIGHT SYNTHESIZER
+    // AUDIO & VISIBILITY RECOVERY
     // ==========================================
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     let audioCtx = null;
@@ -610,21 +625,16 @@
       }
     }
 
-    // AUTO-RESUME AUDIO & UNSTUCK SEARCH ON FOCUS
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         if (audioCtx && audioCtx.state === 'suspended') {
           audioCtx.resume();
         }
         
-        // Force Immediate Reconnection if Socket Dropped
-        if (socket) {
-          if (!socket.connected) {
-            socket.connect();
-          }
+        if (socket && !socket.connected) {
+          socket.connect();
         }
 
-        // If UI stuck on FLEW AWAY! after returning, force reset to next round immediately
         const statusEl = document.getElementById('statusText');
         if (gameState === 'FLYING_AWAY' || (statusEl && statusEl.innerText.includes('FLEW AWAY'))) {
           setTimeout(() => {
@@ -1084,7 +1094,7 @@
       let isBetActive = (id === 1) ? bet1Active : bet2Active;
       let isCashedOut = (id === 1) ? bet1CashedOut : bet2CashedOut;
 
-      if (gameState === 'IDLE' || document.getElementById('statusText').innerText.includes('NEXT ROUND')) {
+      if (gameState === 'IDLE' || document.getElementById('statusText').innerText.includes('NEXT ROUND') || document.getElementById('statusText').innerText.includes('WAITING')) {
         if (!isBetActive && amt <= balance) {
           balance -= amt; 
           if (id === 1) { bet1Active = true; bet1Amount = amt; bet1CashedOut = false; }
@@ -1155,7 +1165,6 @@
       badge.innerText = crashMultiplier.toFixed(2) + 'x';
       document.getElementById('history').prepend(badge);
 
-      // Auto clear crash status after 2.5 seconds back to betting lobby
       setTimeout(() => {
         if (gameState === 'FLYING_AWAY') {
           forceResetToLobbyState();
