@@ -11,7 +11,7 @@
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-    body { background-color: #0d0f12; color: #ffffff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+    body { background-color: #0d0f12; color: #ffffff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; touch-action: manipulation; }
     #splashScreen { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; user-select: none; }
     .splash-logo { font-size: 3rem; font-weight: 900; color: #38bdf8; font-style: italic; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; }
     .plane-icon { font-size: 4rem; animation: floatPlane 1.5s infinite ease-in-out alternate; }
@@ -19,6 +19,11 @@
     .loader-bar { width: 200px; height: 6px; background: #222; border-radius: 10px; overflow: hidden; margin-top: 25px; }
     .loader-fill { width: 0%; height: 100%; background: #38bdf8; transition: width 0.3s; }
     
+    /* PREVENT ZOOM ON MOBILE INPUT FOCUS */
+    input[type="text"], input[type="number"], input[type="password"], input[type="tel"], input[type="email"], select {
+      font-size: 16px !important;
+    }
+
     /* Auth Modal Styling */
     #loginModal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 9990; display: none; align-items: center; justify-content: center; padding: 20px; }
     .login-card { background: #14181f; border-radius: 16px; padding: 24px; width: 100%; max-width: 360px; border: 1px solid #27272a; text-align: center; }
@@ -27,7 +32,7 @@
     .auth-tab-btn.active { background: #1c222d; color: #38bdf8; }
     .auth-pane { display: none; }
     .auth-pane.active { display: block; }
-    .login-input { width: 100%; padding: 12px; background: #0b0d11; border: 1px solid #27272a; color: #fff; border-radius: 8px; margin: 6px 0; outline: none; text-align: center; font-size: 0.95rem; }
+    .login-input { width: 100%; padding: 12px; background: #0b0d11; border: 1px solid #27272a; color: #fff; border-radius: 8px; margin: 6px 0; outline: none; text-align: center; }
     .btn-enter-game { width: 100%; padding: 12px; background: #22c55e; border: none; color: #fff; font-weight: 900; border-radius: 8px; font-size: 1.1rem; cursor: pointer; margin-top: 10px; }
     
     .app-container { width: 100%; max-width: 480px; padding: 10px; display: none; flex-direction: column; }
@@ -62,12 +67,12 @@
     
     .amount-stepper { display: flex; align-items: center; background: #0b0d11; border-radius: 8px; padding: 2px 4px; border: 1px solid #27272a; }
     .step-btn { background: #1f2633; border: none; color: #fff; width: 28px; height: 28px; border-radius: 50%; font-weight: bold; cursor: pointer; }
-    .amount-input { width: 100%; background: transparent; border: none; color: #fff; text-align: center; font-weight: 800; font-size: 1rem; outline: none; }
+    .amount-input { width: 100%; background: transparent; border: none; color: #fff; text-align: center; font-weight: 800; outline: none; }
 
     .quick-preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
     .preset-btn { background: #1c222d; border: 1px solid #27272a; color: #a1a1aa; padding: 4px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer; }
     .auto-cash-row { display: flex; align-items: center; justify-content: space-between; background: #0b0d11; border: 1px solid #27272a; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; color: #94a3b8; }
-    .auto-cash-input { width: 70px; background: #1c222d; border: 1px solid #38bdf8; color: #38bdf8; font-weight: 800; text-align: center; outline: none; font-size: 0.85rem; border-radius: 4px; padding: 2px; }
+    .auto-cash-input { width: 70px; background: #1c222d; border: 1px solid #38bdf8; color: #38bdf8; font-weight: 800; text-align: center; outline: none; border-radius: 4px; padding: 2px; }
     .btn-action-giant { flex: 1.2; height: 85px; border: none; border-radius: 12px; background: #22c55e; color: #ffffff; font-weight: 900; font-size: 1.2rem; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     .btn-action-giant .sub-text { font-size: 0.8rem; font-weight: 700; opacity: 0.9; }
     .btn-waiting-mode { background: #7f1d1d !important; color: #ffffff !important; }
@@ -90,7 +95,7 @@
     .wallet-pane { display: none; text-align: left; }
     .wallet-pane.active { display: block; }
     .form-label { display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px; margin-top: 8px; text-align: left; }
-    .wallet-select { width: 100%; padding: 12px; background: #0b0d11; border: 1px solid #27272a; color: #fff; border-radius: 8px; margin-bottom: 4px; outline: none; font-size: 0.95rem; }
+    .wallet-select { width: 100%; padding: 12px; background: #0b0d11; border: 1px solid #27272a; color: #fff; border-radius: 8px; margin-bottom: 4px; outline: none; }
   </style>
 </head>
 <body>
@@ -482,7 +487,7 @@
     }
 
     // ==========================================
-    // UNSTUCK SOCKET EVENT LISTENERS & AUTO-RECONNECT FIX
+    // UNSTUCK SOCKET EVENT LISTENERS & HARD RESET
     // ==========================================
     function initSocketConnection() {
       if (typeof io === 'undefined') return;
@@ -490,20 +495,12 @@
       socket = io('https://skyline-project.onrender.com', {
         reconnection: true,
         reconnectionAttempts: Infinity,
-        reconnectionDelay: 1000,
-        timeout: 20000
+        reconnectionDelay: 500,
+        timeout: 10000
       });
 
       socket.on('connect', () => {
         console.log('Connected to Render backend successfully!');
-      });
-
-      socket.on('disconnect', (reason) => {
-        console.log('Disconnected from server:', reason);
-      });
-
-      socket.on('connect_error', (err) => {
-        console.error('Connection error:', err);
       });
 
       socket.on('multiplier_update', (data) => {
@@ -525,21 +522,7 @@
       });
 
       socket.on('round_idle', (data) => {
-        gameState = 'IDLE';
-        stopFlightAmbience();
-        startBettingPhaseTraffic();
-
-        document.getElementById('multiplierText').style.color = '#ffffff';
-        document.getElementById('multiplierText').innerText = '1.00x';
-        
-        bet1Active = false;
-        bet1CashedOut = false;
-        bet2Active = false;
-        bet2CashedOut = false;
-
-        resetSimulatedPlayers();
-        resetButtonUI(1);
-        resetButtonUI(2);
+        forceResetToLobbyState();
       });
 
       socket.on('round_started', (data) => {
@@ -568,7 +551,24 @@
       });
     }
 
-    // Initialize socket connection on load
+    function forceResetToLobbyState() {
+      gameState = 'IDLE';
+      stopFlightAmbience();
+      startBettingPhaseTraffic();
+
+      document.getElementById('multiplierText').style.color = '#ffffff';
+      document.getElementById('multiplierText').innerText = '1.00x';
+      
+      bet1Active = false;
+      bet1CashedOut = false;
+      bet2Active = false;
+      bet2CashedOut = false;
+
+      resetSimulatedPlayers();
+      resetButtonUI(1);
+      resetButtonUI(2);
+    }
+
     initSocketConnection();
 
     // ==========================================
@@ -610,22 +610,28 @@
       }
     }
 
-    // AUTO-RESUME AUDIO, FORCE SOCKET RECONNECT, & RE-SYNC WHEN RETURNING TO THE TAB
+    // AUTO-RESUME AUDIO & UNSTUCK SEARCH ON FOCUS
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
-        // 1. Wake up audio context
         if (audioCtx && audioCtx.state === 'suspended') {
           audioCtx.resume();
         }
-        // 2. Force socket reconnection if dropped in background
-        if (socket && !socket.connected) {
-          socket.connect();
+        
+        // Force Immediate Reconnection if Socket Dropped
+        if (socket) {
+          if (!socket.connected) {
+            socket.connect();
+          }
         }
-        // 3. Reset stalled timers if stuck
-        if (gameState === 'IDLE' && (!waitingCountdownTimer || remainingWaitSeconds <= 0)) {
-          startBettingPhaseTraffic();
+
+        // If UI stuck on FLEW AWAY! after returning, force reset to next round immediately
+        const statusEl = document.getElementById('statusText');
+        if (gameState === 'FLYING_AWAY' || (statusEl && statusEl.innerText.includes('FLEW AWAY'))) {
+          setTimeout(() => {
+            forceResetToLobbyState();
+          }, 1000);
         }
-        // 4. Restart canvas loop if paused
+
         if (canvas && !animationFrameId) {
           renderGameLoop();
         }
@@ -1003,7 +1009,7 @@
       }
 
       let handler = PaystackPop.setup({
-        key: 'pk_live_YOUR_ACTUAL_LIVE_KEY_HERE', // <-- Replace with your live Paystack public key here!
+        key: 'pk_live_YOUR_ACTUAL_LIVE_KEY_HERE',
         email: playerUsername + '@gmail.com',
         amount: addAmt * 100,
         currency: 'NGN',
@@ -1148,6 +1154,13 @@
       badge.className = `badge ${badgeClass}`;
       badge.innerText = crashMultiplier.toFixed(2) + 'x';
       document.getElementById('history').prepend(badge);
+
+      // Auto clear crash status after 2.5 seconds back to betting lobby
+      setTimeout(() => {
+        if (gameState === 'FLYING_AWAY') {
+          forceResetToLobbyState();
+        }
+      }, 2500);
     }
 
     function renderBetsList() {
