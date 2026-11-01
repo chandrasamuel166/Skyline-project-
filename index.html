@@ -163,7 +163,7 @@
           <div class="avatar-circle" style="background:#10b981;">🐯</div>
           <div class="avatar-circle" style="background:#3b82f6;">🦁</div>
         </div>
-        <span class="player-count-text" id="activePlayerCount">3,450</span>
+        <span class="player-count-text" id="activePlayerCount">4,150</span>
       </div>
     </div>
 
@@ -375,23 +375,22 @@
     });
 
     // ==========================================
-    // STRICTLY UNBROKEN UPWARD LOBBY & PROPORTIONAL FLIGHT DECAY
+    // STRICTLY UNBROKEN UPWARD LOBBY & ULTRA-FLAT SLOW FLIGHT DECAY
     // ==========================================
-    let currentLivePlayerCount = 3850;
+    let currentLivePlayerCount = 4150;
     let playerTickerInterval = null;
 
     function startBettingPhaseTraffic() {
       if (playerTickerInterval) clearInterval(playerTickerInterval);
       
-      // Initialize lobby population between 3,200 and 6,800
-      currentLivePlayerCount = Math.floor(Math.random() * 3600) + 3200;
+      currentLivePlayerCount = Math.floor(Math.random() * 3500) + 3500;
       updatePlayerCountDisplay();
 
-      // STRICTLY COUNTS UPWARDS CONTINUOUSLY DURING WAITING PHASE (No jumping down)
+      // STRICTLY COUNTS UPWARDS CONTINUOUSLY DURING WAITING PHASE
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'IDLE') return;
         currentLivePlayerCount += Math.floor(Math.random() * 2) + 1; 
-        if (currentLivePlayerCount > 9500) currentLivePlayerCount = 3400; // Smooth reset if reaching high cap
+        if (currentLivePlayerCount > 9800) currentLivePlayerCount = 3500; 
         updatePlayerCountDisplay();
       }, 500);
     }
@@ -399,22 +398,21 @@
     function startFlightPhaseTraffic() {
       if (playerTickerInterval) clearInterval(playerTickerInterval);
       
-      // Proportional slow decay: Stays high when multiplier is low (e.g. 500+, 1000+ players at 20x), 
-      // and scales down gradually so it never drops prematurely or gets stuck at 3.
+      // Ultra-flat logarithmic curve: Maintains thousands of active players even at 50x, 200x, 
+      // and descends extremely gradually so it remains robust through high runs up to 1000x+.
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'RUNNING') return;
         
-        // Decay speed scales inversely with multiplier size so it drops slowly and looks realistic
-        let basePool = 4500;
-        let scaleFactor = Math.min(0.92, (currentMultiplier - 1.0) / 40.0);
+        let basePool = 5200;
+        // Extremely flat scale factor so high multipliers barely reduce the player count
+        let scaleFactor = Math.min(0.65, Math.log10(currentMultiplier + 1) / 5.5);
         let calculatedCount = Math.floor(basePool * (1 - scaleFactor));
         
-        // Add natural micro-fluctuations around the proportional target
-        let noise = Math.floor(Math.random() * 35) - 15;
-        currentLivePlayerCount = Math.max(12, calculatedCount + noise);
+        let noise = Math.floor(Math.random() * 20) - 8;
+        currentLivePlayerCount = Math.max(50, calculatedCount + noise);
         
         updatePlayerCountDisplay();
-      }, 600);
+      }, 800);
     }
 
     function updatePlayerCountDisplay() {
@@ -582,7 +580,6 @@
 
       stopFlightAmbience();
 
-      // Immersive Aviator-style engine hum and ascending pitch chords during flight
       const chordNotes = [196.00, 246.94, 293.66, 392.00, 440.00];
       let noteIdx = 0;
 
@@ -592,7 +589,7 @@
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           
-          osc.type = 'triangle'; // Richer, warm engine-like timbre close to Aviator
+          osc.type = 'triangle';
           osc.frequency.setValueAtTime(chordNotes[noteIdx % chordNotes.length], audioCtx.currentTime);
           
           gain.gain.setValueAtTime(0.035, audioCtx.currentTime);
@@ -633,7 +630,6 @@
         gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.3);
         osc.start(); osc.stop(audioCtx.currentTime + 0.3);
       } else if (type === 'crash') {
-        // Loud, clear Aviator-style crash impact sound
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(180, audioCtx.currentTime);
         osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 0.5);
@@ -941,7 +937,7 @@
       }
 
       let handler = PaystackPop.setup({
-        key: 'pk_live_YOUR_ACTUAL_LIVE_KEY_HERE',
+        key: 'pk_live_YOUR_ACTUAL_LIVE_KEY_HERE', // <-- Replace with your live Paystack public key here!
         email: playerUsername + '@gmail.com',
         amount: addAmt * 100,
         currency: 'NGN',
