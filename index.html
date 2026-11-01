@@ -482,13 +482,24 @@
     }
 
     // ==========================================
-    // UNSTUCK SOCKET EVENT LISTENERS & SYNC
+    // UNSTUCK SOCKET EVENT LISTENERS & AUTO-RECONNECT FIX
     // ==========================================
-    if (typeof io !== 'undefined') {
-      socket = io('https://skyline-project.onrender.com');
+    function initSocketConnection() {
+      if (typeof io === 'undefined') return;
+
+      socket = io('https://skyline-project.onrender.com', {
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 1000,
+        timeout: 20000
+      });
 
       socket.on('connect', () => {
         console.log('Connected to Render backend successfully!');
+      });
+
+      socket.on('disconnect', (reason) => {
+        console.log('Disconnected from server:', reason);
       });
 
       socket.on('connect_error', (err) => {
@@ -557,6 +568,9 @@
       });
     }
 
+    // Initialize socket connection on load
+    initSocketConnection();
+
     // ==========================================
     // GAME & USER STATE
     // ==========================================
@@ -596,16 +610,23 @@
       }
     }
 
-    // AUTO-RESUME AUDIO CONTEXT & RE-SYNC WHEN RETURNING TO THE TAB
+    // AUTO-RESUME AUDIO, FORCE SOCKET RECONNECT, & RE-SYNC WHEN RETURNING TO THE TAB
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
+        // 1. Wake up audio context
         if (audioCtx && audioCtx.state === 'suspended') {
           audioCtx.resume();
         }
+        // 2. Force socket reconnection if dropped in background
+        if (socket && !socket.connected) {
+          socket.connect();
+        }
+        // 3. Reset stalled timers if stuck
         if (gameState === 'IDLE' && (!waitingCountdownTimer || remainingWaitSeconds <= 0)) {
           startBettingPhaseTraffic();
         }
-        if (typeof renderGameLoop === 'function' && !animationFrameId) {
+        // 4. Restart canvas loop if paused
+        if (canvas && !animationFrameId) {
           renderGameLoop();
         }
       }
