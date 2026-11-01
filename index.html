@@ -386,7 +386,6 @@
       currentLivePlayerCount = Math.floor(Math.random() * 3500) + 3500;
       updatePlayerCountDisplay();
 
-      // STRICTLY COUNTS UPWARDS CONTINUOUSLY DURING WAITING PHASE
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'IDLE') return;
         currentLivePlayerCount += Math.floor(Math.random() * 2) + 1; 
@@ -398,13 +397,10 @@
     function startFlightPhaseTraffic() {
       if (playerTickerInterval) clearInterval(playerTickerInterval);
       
-      // Ultra-flat logarithmic curve: Maintains thousands of active players even at 50x, 200x, 
-      // and descends extremely gradually so it remains robust through high runs up to 1000x+.
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'RUNNING') return;
         
         let basePool = 5200;
-        // Extremely flat scale factor so high multipliers barely reduce the player count
         let scaleFactor = Math.min(0.65, Math.log10(currentMultiplier + 1) / 5.5);
         let calculatedCount = Math.floor(basePool * (1 - scaleFactor));
         
@@ -573,6 +569,15 @@
       }
     }
 
+    // AUTO-RESUME AUDIO CONTEXT WHEN RETURNING TO THE TAB / APP
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+      }
+    });
+
     function startFlightAmbience() {
       if (!soundEnabled) return;
       initAudioContext();
@@ -586,6 +591,9 @@
       ambienceInterval = setInterval(() => {
         if (!soundEnabled || gameState !== 'RUNNING') return;
         try {
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           
@@ -617,6 +625,10 @@
       initAudioContext();
       if (!audioCtx) return;
       
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.connect(gain);
