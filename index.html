@@ -397,18 +397,20 @@
     function startFlightPhaseTraffic() {
       if (playerTickerInterval) clearInterval(playerTickerInterval);
       
+      // ULTRA-FLAT LOGARITHMIC DECAY: Scales over a much wider divisor so that at 50x, 200x, or 1000x+, 
+      // the count remains high and descends very slowly.
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'RUNNING') return;
         
-        let basePool = 5200;
-        let scaleFactor = Math.min(0.65, Math.log10(currentMultiplier + 1) / 5.5);
+        let basePool = 5500;
+        let scaleFactor = Math.min(0.45, Math.log10(currentMultiplier + 1) / 7.5);
         let calculatedCount = Math.floor(basePool * (1 - scaleFactor));
         
-        let noise = Math.floor(Math.random() * 20) - 8;
-        currentLivePlayerCount = Math.max(50, calculatedCount + noise);
+        let noise = Math.floor(Math.random() * 18) - 7;
+        currentLivePlayerCount = Math.max(120, calculatedCount + noise);
         
         updatePlayerCountDisplay();
-      }, 800);
+      }, 900);
     }
 
     function updatePlayerCountDisplay() {
