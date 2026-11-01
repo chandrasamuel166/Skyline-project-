@@ -448,31 +448,23 @@
     }
 
     // ==========================================
-    // ROLLING INFINITE SCALING SIMULATED PLAYERS (2000x - 4000x+ Safe)
+    // ROLLING INFINITE SCALING SIMULATED PLAYERS
     // ==========================================
     let activeSimPlayers = [
-      { name: "k***3", bet: 45000, cashed: false, cashX: 0, win: 0, avatar: "🕶️" },
-      { name: "9***9", bet: 12500, cashed: false, cashX: 0, win: 0, avatar: "🐯" },
-      { name: "o***y", bet: 30000, cashed: false, cashX: 0, win: 0, avatar: "🦒" },
-      { name: "b***5", bet: 8500, cashed: false, cashX: 0, win: 0, avatar: "🦁" },
-      { name: "j***e", bet: 50000, cashed: false, cashX: 0, win: 0, avatar: "🎲" },
-      { name: "n***e", bet: 15000, cashed: false, cashX: 0, win: 0, avatar: "🕶️" },
-      { name: "u***2", bet: 20000, cashed: false, cashX: 0, win: 0, avatar: "🐵" },
-      { name: "y***4", bet: 10000, cashed: false, cashX: 0, win: 0, avatar: "🦅" }
+      { name: "k***3", bet: 45000, cashed: false, cashX: 1.5, win: 0, avatar: "🕶️" },
+      { name: "9***9", bet: 12500, cashed: false, cashX: 2.2, win: 0, avatar: "🐯" },
+      { name: "o***y", bet: 30000, cashed: false, cashX: 3.1, win: 0, avatar: "🦒" },
+      { name: "b***5", bet: 8500, cashed: false, cashX: 4.5, win: 0, avatar: "🦁" },
+      { name: "j***e", bet: 50000, cashed: false, cashX: 6.8, win: 0, avatar: "🎲" },
+      { name: "n***e", bet: 15000, cashed: false, cashX: 9.4, win: 0, avatar: "🕶️" },
+      { name: "u***2", bet: 20000, cashed: false, cashX: 14.0, win: 0, avatar: "🐵" },
+      { name: "y***4", bet: 10000, cashed: false, cashX: 22.0, win: 0, avatar: "🦅" }
     ];
 
     function resetSimulatedPlayers() {
       activeSimPlayers.forEach(p => {
         p.cashed = false;
-        // Generate targets across wide tiers so table never freezes at high multipliers
-        let roll = Math.random();
-        if (roll < 0.4) {
-          p.cashX = parseFloat((1.2 + Math.random() * 25.0).toFixed(2));
-        } else if (roll < 0.8) {
-          p.cashX = parseFloat((30.0 + Math.random() * 350.0).toFixed(2));
-        } else {
-          p.cashX = parseFloat((400.0 + Math.random() * 3500.0).toFixed(2));
-        }
+        p.cashX = parseFloat((1.1 + Math.random() * 25.0).toFixed(2));
         p.win = p.bet * p.cashX;
       });
       renderBetsList();
@@ -484,10 +476,10 @@
       activeSimPlayers.forEach(p => {
         if (!p.cashed && currentMultiplier >= p.cashX) {
           p.cashed = true; 
-        } else if (p.cashed && currentMultiplier > p.cashX) {
-          // CONTINUOUS ROLLING RE-CYCLE: Keeps generating higher targets as multiplier climbs past 2000x / 4000x
+        } else if (p.cashed && currentMultiplier > p.cashX * 1.5) {
+          // Continuous loop recycling targets infinitely so table never freezes at high multipliers
           p.cashed = false;
-          p.cashX = parseFloat((currentMultiplier + 20 + Math.random() * 2000).toFixed(2));
+          p.cashX = parseFloat((currentMultiplier + 10 + Math.random() * 1000).toFixed(2));
           p.win = p.bet * p.cashX;
         }
       });
@@ -573,7 +565,7 @@
       document.getElementById('multiplierText').style.color = '#ffffff';
       document.getElementById('multiplierText').innerText = '1.00x';
       
-      // Cleanly wipe out bets when new game starts
+      // Cleanly clear user bets on new game start
       bet1Active = false;
       bet1CashedOut = false;
       bet2Active = false;
