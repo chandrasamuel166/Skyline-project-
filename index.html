@@ -448,7 +448,7 @@
     }
 
     // ==========================================
-    // SIMULATED PLAYERS ENGINE (INFINITE ROLLING COUNTER)
+    // SIMULATED PLAYERS ENGINE (LOCKED CUMULATIVE WIN)
     // ==========================================
     let activeSimPlayers = [
       { name: "k***3", bet: 45000, cashed: false, cashX: 1.35, win: 0, avatar: "🕶️" },
@@ -464,7 +464,6 @@
     function resetSimulatedPlayers() {
       activeSimPlayers.forEach((p, idx) => {
         p.cashed = false;
-        // Spread cash-out multipliers evenly across reasonable tiers
         let baseTiers = [1.25, 1.60, 2.10, 3.40, 5.20, 8.50, 14.00, 25.00];
         p.cashX = parseFloat((baseTiers[idx] + Math.random() * 0.4).toFixed(2));
         p.win = p.bet * p.cashX;
@@ -476,17 +475,10 @@
       if (gameState !== 'RUNNING') return;
       
       activeSimPlayers.forEach(p => {
-        // Trigger cash out when multiplier reaches target
         if (!p.cashed && currentMultiplier >= p.cashX) {
           p.cashed = true;
           p.win = p.bet * p.cashX;
         } 
-        // Continuous rolling update for high multiplier runs (2000x-4000x+)
-        else if (p.cashed && currentMultiplier > p.cashX * 2.0) {
-          p.cashed = false;
-          p.cashX = parseFloat((currentMultiplier + 5.0 + Math.random() * 500.0).toFixed(2));
-          p.win = p.bet * p.cashX;
-        }
       });
 
       const badgeEl = document.querySelector('.bets-count-badge');
@@ -523,7 +515,7 @@
     }
 
     // ==========================================
-    // SOCKET LISTENERS & STABLE BET HANDLING
+    // SOCKET LISTENERS & BULLETPROOF BET STATES
     // ==========================================
     function initSocketConnection() {
       if (typeof io === 'undefined') return;
@@ -558,7 +550,7 @@
       });
 
       socket.on('round_idle', (data) => {
-        forceResetToLobbyState();
+        // Safe lobby state: preserves user's queued next-round bets
       });
 
       socket.on('round_started', (data) => {
@@ -575,9 +567,28 @@
         document.getElementById('statusText').innerText = ''; 
         document.getElementById('multiplierText').style.color = '#ffffff';
         
-        // Transition pending bets safely to active cash-out mode without wiping
-        if (bet1Active) setBtnCashoutMode(1); else setBtnDisabledMode(1);
-        if (bet2Active) setBtnCashoutMode(2); else setBtnDisabledMode(2);
+        // Safely transition queued bets into active gameplay without resetting them
+        if (nextRoundBet1) {
+          bet1Active = true;
+          bet1CashedOut = false;
+          nextRoundBet1 = false;
+          setBtnCashoutMode(1);
+        } else {
+          bet1Active = false;
+          bet1CashedOut = false;
+          resetButtonUI(1);
+        }
+
+        if (nextRoundBet2) {
+          bet2Active = true;
+          bet2CashedOut = false;
+          nextRoundBet2 = false;
+          setBtnCashoutMode(2);
+        } else {
+          bet2Active = false;
+          bet2CashedOut = false;
+          resetButtonUI(2);
+        }
       });
 
       socket.on('round_crashed', (data) => {
@@ -596,14 +607,28 @@
       document.getElementById('multiplierText').style.color = '#ffffff';
       document.getElementById('multiplierText').innerText = '1.00x';
       
-      // Reset user bet flags cleanly AFTER a completed round crash
-      bet1Active = false;
-      bet1CashedOut = false;
-      bet2Active = false;
-      bet2CashedOut = false;
-      
-      resetButtonUI(1);
-      resetButtonUI(2);
+      // If user queued bets for the upcoming round during the previous flight/crash, retain them
+      if (nextRoundBet1) {
+        const btn = document.getElementById('mainBtn1');
+        btn.className = 'btn-action-giant btn-waiting-mode';
+        btn.querySelector('span').innerText = 'Cancel';
+        document.getElementById('subBtn1').innerText = 'Waiting for next round';
+      } else {
+        bet1Active = false;
+        bet1CashedOut = false;
+        resetButtonUI(1);
+      }
+
+      if (nextRoundBet2) {
+        const btn = document.getElementById('mainBtn2');
+        btn.className = 'btn-action-giant btn-waiting-mode';
+        btn.querySelector('span').innerText = 'Cancel';
+        document.getElementById('subBtn2').innerText = 'Waiting for next round';
+      } else {
+        bet2Active = false;
+        bet2CashedOut = false;
+        resetButtonUI(2);
+      }
 
       resetSimulatedPlayers();
     }
@@ -628,10 +653,12 @@
     let bet1Active = false;
     let bet1Amount = 50;
     let bet1CashedOut = false;
+    let nextRoundBet1 = false;
 
     let bet2Active = false;
     let bet2Amount = 50;
     let bet2CashedOut = false;
+    let nextRoundBet2 = false;
 
     // ==========================================
     // AUDIO & VISIBILITY RECOVERY
@@ -819,8 +846,10 @@
       gameState = 'IDLE';
       bet1Active = false;
       bet1CashedOut = false;
+      nextRoundBet1 = false;
       bet2Active = false;
       bet2CashedOut = false;
+      nextRoundBet2 = false;
 
       document.getElementById('displayUsername').innerText = username;
       document.getElementById('loginModal').style.display = 'none';
@@ -918,8 +947,9 @@
       const input = document.getElementById(`betAmt${id}`);
       let val = parseFloat(input.value) || 50;
       if (val < 10) val = 10;
-      let active = (id === 1) ? bet1Active : bet2Active;
-      if (!active) {
+      let isQueued = (id === 1) ? nextRoundBet1 : nextRoundBet2;
+      let isActive = (id === 1) ? bet1Active : bet2Active;
+      if (!isQueued && !isActive) {
         const sub = document.getElementById(`subBtn${id}`);
         if (sub) sub.innerText = `${val.toFixed(2)} NGN`;
       }
@@ -930,8 +960,9 @@
       if (!input) return;
       let val = Math.max(50, (parseFloat(input.value) || 50) + delta);
       input.value = val;
-      let active = (id === 1) ? bet1Active : bet2Active;
-      if (!active) {
+      let isQueued = (id === 1) ? nextRoundBet1 : nextRoundBet2;
+      let isActive = (id === 1) ? bet1Active : bet2Active;
+      if (!isQueued && !isActive) {
         const sub = document.getElementById(`subBtn${id}`);
         if (sub) sub.innerText = `${val.toFixed(2)} NGN`;
       }
@@ -943,8 +974,9 @@
       let currentVal = parseFloat(input.value) || 50;
       let newVal = currentVal + val;
       input.value = newVal;
-      let active = (id === 1) ? bet1Active : bet2Active;
-      if (!active) {
+      let isQueued = (id === 1) ? nextRoundBet1 : nextRoundBet2;
+      let isActive = (id === 1) ? bet1Active : bet2Active;
+      if (!isQueued && !isActive) {
         const sub = document.getElementById(`subBtn${id}`);
         if (sub) sub.innerText = `${newVal.toFixed(2)} NGN`;
       }
@@ -1115,23 +1147,24 @@
 
     function handleBetAction(id) {
       const amt = parseFloat(document.getElementById(`betAmt${id}`).value) || 50;
+      let isQueued = (id === 1) ? nextRoundBet1 : nextRoundBet2;
       let isBetActive = (id === 1) ? bet1Active : bet2Active;
       let isCashedOut = (id === 1) ? bet1CashedOut : bet2CashedOut;
 
       if (gameState === 'IDLE' || document.getElementById('statusText').innerText.includes('NEXT ROUND') || document.getElementById('statusText').innerText.includes('WAITING')) {
-        if (!isBetActive && amt <= balance) {
+        if (!isQueued && amt <= balance) {
           balance -= amt; 
-          if (id === 1) { bet1Active = true; bet1Amount = amt; bet1CashedOut = false; }
-          else { bet2Active = true; bet2Amount = amt; bet2CashedOut = false; }
+          if (id === 1) { nextRoundBet1 = true; bet1Amount = amt; }
+          else { nextRoundBet2 = true; bet2Amount = amt; }
           
           updateBalanceDisplay();
           const btn = document.getElementById(`mainBtn${id}`);
           btn.className = 'btn-action-giant btn-waiting-mode';
           btn.querySelector('span').innerText = 'Cancel';
           document.getElementById(`subBtn${id}`).innerText = 'Waiting for next round';
-        } else if (isBetActive) {
+        } else if (isQueued) {
           balance += amt;
-          if (id === 1) { bet1Active = false; } else { bet2Active = false; }
+          if (id === 1) { nextRoundBet1 = false; } else { nextRoundBet2 = false; }
           updateBalanceDisplay();
           resetButtonUI(id);
         }
@@ -1163,14 +1196,6 @@
       btn.querySelector('span').innerText = 'CASH OUT';
       let activeAmt = (id === 1) ? bet1Amount : bet2Amount;
       document.getElementById(`subBtn${id}`).innerText = `${(activeAmt * currentMultiplier).toFixed(2)} NGN`;
-    }
-
-    function setBtnDisabledMode(id) {
-      const btn = document.getElementById(`mainBtn${id}`);
-      btn.className = 'btn-action-giant';
-      btn.style.background = '#27272a';
-      btn.querySelector('span').innerText = 'IN GAME';
-      document.getElementById(`subBtn${id}`).innerText = 'WAITING';
     }
 
     function triggerFlyAway() {
