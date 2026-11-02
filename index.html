@@ -380,7 +380,7 @@
     });
 
     // ==========================================
-    // STRICT 7-SECOND WAITING TIMER & 0.0s WATCHDOG FAILSAFE
+    // STRICT 7-SECOND WAITING TIMER & WATCHDOG
     // ==========================================
     let currentLivePlayerCount = 4150;
     let playerTickerInterval = null;
@@ -448,23 +448,25 @@
     }
 
     // ==========================================
-    // ROLLING INFINITE SCALING SIMULATED PLAYERS
+    // SIMULATED PLAYERS ENGINE (INFINITE ROLLING COUNTER)
     // ==========================================
     let activeSimPlayers = [
-      { name: "k***3", bet: 45000, cashed: false, cashX: 1.5, win: 0, avatar: "🕶️" },
-      { name: "9***9", bet: 12500, cashed: false, cashX: 2.2, win: 0, avatar: "🐯" },
-      { name: "o***y", bet: 30000, cashed: false, cashX: 3.1, win: 0, avatar: "🦒" },
-      { name: "b***5", bet: 8500, cashed: false, cashX: 4.5, win: 0, avatar: "🦁" },
-      { name: "j***e", bet: 50000, cashed: false, cashX: 6.8, win: 0, avatar: "🎲" },
-      { name: "n***e", bet: 15000, cashed: false, cashX: 9.4, win: 0, avatar: "🕶️" },
-      { name: "u***2", bet: 20000, cashed: false, cashX: 14.0, win: 0, avatar: "🐵" },
-      { name: "y***4", bet: 10000, cashed: false, cashX: 22.0, win: 0, avatar: "🦅" }
+      { name: "k***3", bet: 45000, cashed: false, cashX: 1.35, win: 0, avatar: "🕶️" },
+      { name: "9***9", bet: 12500, cashed: false, cashX: 1.80, win: 0, avatar: "🐯" },
+      { name: "o***y", bet: 30000, cashed: false, cashX: 2.45, win: 0, avatar: "🦒" },
+      { name: "b***5", bet: 8500, cashed: false, cashX: 3.10, win: 0, avatar: "🦁" },
+      { name: "j***e", bet: 50000, cashed: false, cashX: 4.80, win: 0, avatar: "🎲" },
+      { name: "n***e", bet: 15000, cashed: false, cashX: 7.20, win: 0, avatar: "🕶️" },
+      { name: "u***2", bet: 20000, cashed: false, cashX: 12.50, win: 0, avatar: "🐵" },
+      { name: "y***4", bet: 10000, cashed: false, cashX: 19.80, win: 0, avatar: "🦅" }
     ];
 
     function resetSimulatedPlayers() {
-      activeSimPlayers.forEach(p => {
+      activeSimPlayers.forEach((p, idx) => {
         p.cashed = false;
-        p.cashX = parseFloat((1.1 + Math.random() * 25.0).toFixed(2));
+        // Spread cash-out multipliers evenly across reasonable tiers
+        let baseTiers = [1.25, 1.60, 2.10, 3.40, 5.20, 8.50, 14.00, 25.00];
+        p.cashX = parseFloat((baseTiers[idx] + Math.random() * 0.4).toFixed(2));
         p.win = p.bet * p.cashX;
       });
       renderBetsList();
@@ -474,12 +476,15 @@
       if (gameState !== 'RUNNING') return;
       
       activeSimPlayers.forEach(p => {
+        // Trigger cash out when multiplier reaches target
         if (!p.cashed && currentMultiplier >= p.cashX) {
-          p.cashed = true; 
-        } else if (p.cashed && currentMultiplier > p.cashX * 1.5) {
-          // Continuous loop recycling targets infinitely so table never freezes at high multipliers
+          p.cashed = true;
+          p.win = p.bet * p.cashX;
+        } 
+        // Continuous rolling update for high multiplier runs (2000x-4000x+)
+        else if (p.cashed && currentMultiplier > p.cashX * 2.0) {
           p.cashed = false;
-          p.cashX = parseFloat((currentMultiplier + 10 + Math.random() * 1000).toFixed(2));
+          p.cashX = parseFloat((currentMultiplier + 5.0 + Math.random() * 500.0).toFixed(2));
           p.win = p.bet * p.cashX;
         }
       });
@@ -492,8 +497,33 @@
       renderBetsList();
     }
 
+    function renderBetsList() {
+      const list = document.getElementById('betsList');
+      if (!list) return;
+      list.innerHTML = ``;
+      let totalWin = 0;
+
+      activeSimPlayers.forEach(p => {
+        if (p.cashed) totalWin += p.win;
+        const row = document.createElement('div');
+        row.className = 'bet-row';
+        row.innerHTML = `
+          <div class="player-name"><span>${p.avatar}</span> <span>${p.name}</span></div>
+          <div>${p.bet.toLocaleString('en-US', {minimumFractionDigits:2})}</div>
+          <div class="cashout-x">${p.cashed ? p.cashX.toFixed(2) + 'x' : '-'}</div>
+          <div class="win-amt">${p.cashed ? p.win.toLocaleString('en-US', {minimumFractionDigits:2}) : '-'}</div>
+        `;
+        list.appendChild(row);
+      });
+      
+      const totalWinEl = document.getElementById('totalWinAmount');
+      if (totalWinEl) {
+        totalWinEl.innerText = totalWin.toLocaleString('en-US', {minimumFractionDigits: 2});
+      }
+    }
+
     // ==========================================
-    // SOCKET LISTENERS & CLEAN LOBBY RESET
+    // SOCKET LISTENERS & STABLE BET HANDLING
     // ==========================================
     function initSocketConnection() {
       if (typeof io === 'undefined') return;
@@ -545,6 +575,7 @@
         document.getElementById('statusText').innerText = ''; 
         document.getElementById('multiplierText').style.color = '#ffffff';
         
+        // Transition pending bets safely to active cash-out mode without wiping
         if (bet1Active) setBtnCashoutMode(1); else setBtnDisabledMode(1);
         if (bet2Active) setBtnCashoutMode(2); else setBtnDisabledMode(2);
       });
@@ -565,11 +596,12 @@
       document.getElementById('multiplierText').style.color = '#ffffff';
       document.getElementById('multiplierText').innerText = '1.00x';
       
-      // Cleanly clear user bets on new game start
+      // Reset user bet flags cleanly AFTER a completed round crash
       bet1Active = false;
       bet1CashedOut = false;
       bet2Active = false;
       bet2CashedOut = false;
+      
       resetButtonUI(1);
       resetButtonUI(2);
 
@@ -1162,26 +1194,6 @@
           forceResetToLobbyState();
         }
       }, 2500);
-    }
-
-    function renderBetsList() {
-      const list = document.getElementById('betsList');
-      if (!list) return;
-      list.innerHTML = ``;
-      let totalWin = 0;
-      activeSimPlayers.forEach(p => {
-        if (p.cashed) totalWin += p.win;
-        const row = document.createElement('div');
-        row.className = 'bet-row';
-        row.innerHTML = `
-          <div class="player-name"><span>${p.avatar}</span> <span>${p.name}</span></div>
-          <div>${p.bet.toLocaleString('en-US', {minimumFractionDigits:2})}</div>
-          <div class="cashout-x">${p.cashed ? p.cashX.toFixed(2) + 'x' : ''}</div>
-          <div class="win-amt">${p.cashed ? p.win.toLocaleString('en-US', {maximumFractionDigits:2}) : ''}</div>
-        `;
-        list.appendChild(row);
-      });
-      document.getElementById('totalWinAmount').innerText = totalWin.toLocaleString('en-US', {minimumFractionDigits: 2});
     }
 
     function updateBalanceDisplay() {
