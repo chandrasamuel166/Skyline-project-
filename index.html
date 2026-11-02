@@ -17,12 +17,10 @@
     .loader-bar { width: 200px; height: 6px; background: #222; border-radius: 10px; overflow: hidden; margin-top: 25px; }
     .loader-fill { width: 0%; height: 100%; background: #38bdf8; transition: width 0.3s; }
     
-    /* PREVENT ZOOM ON MOBILE INPUT FOCUS */
     input[type="text"], input[type="number"], input[type="password"], input[type="tel"], input[type="email"], select {
       font-size: 16px !important;
     }
 
-    /* Auth Modal Styling */
     #loginModal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 9990; display: none; align-items: center; justify-content: center; padding: 20px; }
     .login-card { background: #14181f; border-radius: 16px; padding: 24px; width: 100%; max-width: 360px; border: 1px solid #27272a; text-align: center; }
     .auth-tabs { display: flex; gap: 4px; background: #0b0d11; padding: 4px; border-radius: 10px; margin-bottom: 16px; border: 1px solid #27272a; }
@@ -104,7 +102,7 @@
     <div class="loader-bar"><div class="loader-fill" id="splashFill"></div></div>
   </div>
 
-  <!-- AUTH / LOGIN MODAL WITH REGISTER TAB -->
+  <!-- AUTH MODAL -->
   <div id="loginModal">
     <div class="login-card">
       <h2 style="color:#38bdf8; font-weight:900; margin-bottom:12px; font-style:italic;">SKYLINE</h2>
@@ -351,38 +349,44 @@
   </div>
 
   <script>
-    // ==========================================
-    // LOCAL STANDALONE GAME ENGINE (GITHUB PAGES)
-    // ==========================================
     let canvas, ctx;
     let animationFrameId;
-
-    // Splash Loader Window Sync
-    window.addEventListener('load', () => {
-      let fill = document.getElementById('splashFill');
-      let w = 0;
-      let interval = setInterval(() => {
-        w += 10;
-        if (fill) fill.style.width = w + '%';
-        if (w >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            const splash = document.getElementById('splashScreen');
-            if (splash) splash.style.display = 'none';
-            const login = document.getElementById('loginModal');
-            if (login) login.style.display = 'flex';
-          }, 250);
-        }
-      }, 70);
-    });
-
-    // ==========================================
-    // LOCAL GAME LOOP & MULTIPLIER GENERATOR
-    // ==========================================
     let currentLivePlayerCount = 4150;
     let playerTickerInterval = null;
     let waitingCountdownTimer = null;
     let remainingWaitSeconds = 7.0;
+    let flightInterval = null;
+
+    let balance = 2900.00;
+    let soundEnabled = true;
+    let currentUserKey = null;
+    let userDepositProfile = { bankName: "Opay", accountNumber: "0123456789" };
+
+    let gameState = 'IDLE'; 
+    let currentMultiplier = 1.00;
+    let crashMultiplier = 1.00;
+    
+    let bet1Active = false;
+    let bet1Amount = 50;
+    let bet1CashedOut = false;
+    let nextRoundBet1 = false;
+
+    let bet2Active = false;
+    let bet2Amount = 50;
+    let bet2CashedOut = false;
+    let nextRoundBet2 = false;
+
+    // Guaranteed Splash Initialization
+    window.addEventListener('DOMContentLoaded', () => {
+      let fill = document.getElementById('splashFill');
+      if (fill) fill.style.width = '100%';
+      setTimeout(() => {
+        const splash = document.getElementById('splashScreen');
+        if (splash) splash.style.display = 'none';
+        const login = document.getElementById('loginModal');
+        if (login) login.style.display = 'flex';
+      }, 400);
+    });
 
     function startBettingPhaseTraffic() {
       if (playerTickerInterval) clearInterval(playerTickerInterval);
@@ -406,7 +410,7 @@
           if (statusEl) statusEl.innerText = `STARTING FLIGHT...`;
           setTimeout(() => {
             if (gameState === 'IDLE') triggerNewRoundStart();
-          }, 400);
+          }, 300);
         } else {
           if (statusEl) {
             statusEl.innerText = `NEXT ROUND IN ${remainingWaitSeconds.toFixed(1)}s`;
@@ -428,14 +432,11 @@
       
       playerTickerInterval = setInterval(() => {
         if (gameState !== 'RUNNING') return;
-        
         let basePool = 5500;
         let scaleFactor = Math.min(0.45, Math.log10(currentMultiplier + 1) / 7.5);
         let calculatedCount = Math.floor(basePool * (1 - scaleFactor));
-        
         let noise = Math.floor(Math.random() * 18) - 7;
         currentLivePlayerCount = Math.max(120, calculatedCount + noise);
-        
         updatePlayerCountDisplay();
       }, 900);
     }
@@ -447,9 +448,6 @@
       }
     }
 
-    // ==========================================
-    // SIMULATED PLAYERS ENGINE (CONTINUOUS ROLLING WINS)
-    // ==========================================
     let activeSimPlayers = [
       { name: "k***3", bet: 45000, cashed: false, cashX: 1.35, win: 0, avatar: "🕶️" },
       { name: "9***9", bet: 12500, cashed: false, cashX: 1.80, win: 0, avatar: "🐯" },
@@ -473,24 +471,20 @@
 
     function updateSimulatedPlayersProgress() {
       if (gameState !== 'RUNNING') return;
-      
       activeSimPlayers.forEach(p => {
         if (!p.cashed && currentMultiplier >= p.cashX) {
           p.cashed = true;
           p.win = p.bet * p.cashX;
-        } 
-        else if (p.cashed && currentMultiplier > p.cashX * 1.5) {
+        } else if (p.cashed && currentMultiplier > p.cashX * 1.5) {
           p.cashed = false;
           p.cashX = parseFloat((currentMultiplier + 2.0 + Math.random() * 15.0).toFixed(2));
           p.win = p.bet * p.cashX;
         }
       });
-
       const badgeEl = document.querySelector('.bets-count-badge');
       if (badgeEl) {
         badgeEl.innerText = `${activeSimPlayers.length}/${activeSimPlayers.length} Active`;
       }
-
       renderBetsList();
     }
 
@@ -519,11 +513,6 @@
       }
     }
 
-    // ==========================================
-    // ROUND & FLIGHT SIMULATION LOOP
-    // ==========================================
-    let flightInterval = null;
-
     function triggerNewRoundStart() {
       gameState = 'RUNNING';
       let r = Math.random();
@@ -535,7 +524,6 @@
       }
 
       currentMultiplier = 1.00;
-      
       if (waitingCountdownTimer) clearInterval(waitingCountdownTimer);
 
       resetSimulatedPlayers();
@@ -631,35 +619,6 @@
       resetSimulatedPlayers();
     }
 
-    // ==========================================
-    // GAME & USER STATE
-    // ==========================================
-    let balance = 2900.00;
-    let soundEnabled = true;
-    let currentUserKey = null;
-    
-    let userDepositProfile = {
-      bankName: "Opay",
-      accountNumber: "0123456789"
-    };
-
-    let gameState = 'IDLE'; 
-    let currentMultiplier = 1.00;
-    let crashMultiplier = 1.00;
-    
-    let bet1Active = false;
-    let bet1Amount = 50;
-    let bet1CashedOut = false;
-    let nextRoundBet1 = false;
-
-    let bet2Active = false;
-    let bet2Amount = 50;
-    let bet2CashedOut = false;
-    let nextRoundBet2 = false;
-
-    // ==========================================
-    // AUDIO & VISIBILITY RECOVERY
-    // ==========================================
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     let audioCtx = null;
     let ambienceInterval = null;
@@ -673,30 +632,10 @@
       }
     }
 
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        if (audioCtx && audioCtx.state === 'suspended') {
-          audioCtx.resume();
-        }
-
-        const statusEl = document.getElementById('statusText');
-        if (gameState === 'FLYING_AWAY' || (statusEl && statusEl.innerText.includes('FLEW AWAY'))) {
-          setTimeout(() => {
-            forceResetToLobbyState();
-          }, 1000);
-        }
-
-        if (canvas && !animationFrameId) {
-          renderGameLoop();
-        }
-      }
-    });
-
     function startFlightAmbience() {
       if (!soundEnabled) return;
       initAudioContext();
       if (!audioCtx) return;
-
       stopFlightAmbience();
 
       const chordNotes = [196.00, 246.94, 293.66, 392.00, 440.00];
@@ -705,21 +644,15 @@
       ambienceInterval = setInterval(() => {
         if (!soundEnabled || gameState !== 'RUNNING') return;
         try {
-          if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-          }
+          if (audioCtx.state === 'suspended') audioCtx.resume();
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
-          
           osc.type = 'triangle';
           osc.frequency.setValueAtTime(chordNotes[noteIdx % chordNotes.length], audioCtx.currentTime);
-          
           gain.gain.setValueAtTime(0.035, audioCtx.currentTime);
           gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5);
-
           osc.connect(gain);
           gain.connect(audioCtx.destination);
-
           osc.start();
           osc.stop(audioCtx.currentTime + 0.5);
           noteIdx++;
@@ -738,10 +671,7 @@
       if (!soundEnabled) return;
       initAudioContext();
       if (!audioCtx) return;
-      
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
 
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
@@ -768,11 +698,8 @@
     function toggleSound() {
       soundEnabled = !soundEnabled;
       document.getElementById('soundToggleBtn').innerText = soundEnabled ? '🔊' : '🔇';
-      if (!soundEnabled) {
-        stopFlightAmbience();
-      } else if (gameState === 'RUNNING') {
-        startFlightAmbience();
-      }
+      if (!soundEnabled) stopFlightAmbience();
+      else if (gameState === 'RUNNING') startFlightAmbience();
     }
 
     function switchAuthTab(mode) {
@@ -878,7 +805,6 @@
       initCanvasLoop();
       resetSimulatedPlayers();
       updateBalanceDisplay();
-      
       startBettingPhaseTraffic();
     }
 
@@ -905,16 +831,12 @@
       }
     }
 
-    // ==========================================
-    // CANVAS & FLIGHT ANIMATION RENDER LOOP
-    // ==========================================
     function initCanvasLoop() {
       canvas = document.getElementById('gameCanvas');
       if (!canvas) return;
       ctx = canvas.getContext('2d');
       resizeCanvas();
       window.addEventListener('resize', resizeCanvas);
-      
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
       renderGameLoop();
     }
@@ -927,14 +849,11 @@
 
     function renderGameLoop() {
       if (!ctx || !canvas) return;
-      
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawBackgroundRays(gameState === 'FLYING_AWAY');
-
       if (gameState === 'RUNNING' || gameState === 'FLYING_AWAY') {
         drawPlaneGraphic();
       }
-
       animationFrameId = requestAnimationFrame(renderGameLoop);
     }
 
@@ -951,10 +870,8 @@
 
     function drawPlaneGraphic() {
       if (!ctx || !canvas) return;
-      
       const width = canvas.width;
       const height = canvas.height;
-
       let progress = Math.min(1, Math.max(0, (currentMultiplier - 1.00) / 10.0));
       let x = width * 0.15 + (width * 0.7 * progress);
       let y = height * 0.85 - (height * 0.65 * progress);
@@ -1014,7 +931,6 @@
     function checkAutoCashOut(id) {
       const autoInput = document.getElementById(`autoCash${id}`);
       if (!autoInput || !autoInput.value) return;
-      
       const targetX = parseFloat(autoInput.value);
       if (isNaN(targetX) || targetX <= 1.00) return;
 
@@ -1036,13 +952,8 @@
       document.getElementById('walletModal').style.display = 'none'; 
     }
 
-    function openFairModal() {
-      document.getElementById('fairModal').style.display = 'flex';
-    }
-
-    function closeFairModal() {
-      document.getElementById('fairModal').style.display = 'none';
-    }
+    function openFairModal() { document.getElementById('fairModal').style.display = 'flex'; }
+    function closeFairModal() { document.getElementById('fairModal').style.display = 'none'; }
 
     function switchWalletTab(tabName) {
       const tabDep = document.getElementById('tabDepositBtn');
@@ -1068,7 +979,6 @@
       const sourceType = document.getElementById('depositSourceType').value;
       const diffFields = document.getElementById('differentDepositFields');
       const defaultBox = document.getElementById('defaultDepositBankBox');
-
       if (sourceType === 'different_deposit_bank') {
         diffFields.style.display = 'block';
         defaultBox.style.display = 'none';
@@ -1083,7 +993,6 @@
       if (userDepositProfile.accountNumber) {
         usualBoxText.innerText = `${userDepositProfile.bankName} - ${userDepositProfile.accountNumber}`;
       }
-
       const infoBox = document.getElementById('summaryDepositBankInfo');
       if (userDepositProfile.accountNumber) {
         infoBox.innerText = `${userDepositProfile.bankName} - ${userDepositProfile.accountNumber}`;
@@ -1097,11 +1006,7 @@
     function initiateRealDepositVerification() {
       const addAmt = parseFloat(document.getElementById('depositAmountInput').value) || 0;
       const playerUsername = document.getElementById('displayUsername').innerText || "player@skyline.game";
-
-      if (addAmt <= 0) {
-        alert("Please enter a valid deposit amount.");
-        return;
-      }
+      if (addAmt <= 0) { alert("Please enter a valid deposit amount."); return; }
 
       let handler = PaystackPop.setup({
         key: 'pk_live_YOUR_ACTUAL_LIVE_KEY_HERE',
@@ -1115,9 +1020,7 @@
           closeWalletModal();
           alert('Deposit Successful! Reference: ' + response.reference);
         },
-        onClose: function() {
-          alert('Transaction was cancelled.');
-        }
+        onClose: function() { alert('Transaction was cancelled.'); }
       });
       handler.openIframe();
     }
@@ -1126,7 +1029,6 @@
       const destType = document.getElementById('withdrawDestinationType').value;
       const anotherBankFields = document.getElementById('anotherBankFields');
       const defaultBox = document.getElementById('defaultBankInfoBox');
-
       if (destType === 'another_bank') {
         anotherBankFields.style.display = 'block';
         defaultBox.style.display = 'none';
@@ -1139,33 +1041,18 @@
     function processWithdrawal() {
       const wAmt = parseFloat(document.getElementById('withdrawAmountInput').value) || 0;
       const destType = document.getElementById('withdrawDestinationType').value;
-
-      if (wAmt <= 0) {
-        alert("Please enter a valid withdrawal amount.");
-        return;
-      }
-
-      if (wAmt > balance) {
-        alert("Insufficient balance for this withdrawal request.");
-        return;
-      }
+      if (wAmt <= 0) { alert("Please enter a valid withdrawal amount."); return; }
+      if (wAmt > balance) { alert("Insufficient balance for this withdrawal request."); return; }
 
       let payoutDestinationDesc = "";
       if (destType === 'deposit_account') {
-        if (!userDepositProfile.accountNumber) {
-          alert("No deposit account registered. Please use 'Withdraw to Another Bank'.");
-          return;
-        }
+        if (!userDepositProfile.accountNumber) { alert("No deposit account registered."); return; }
         payoutDestinationDesc = `${userDepositProfile.bankName} account (${userDepositProfile.accountNumber})`;
       } else {
         const targetBank = document.getElementById('newWithdrawBank').value;
         const targetAcc = document.getElementById('newWithdrawAccNum').value.trim();
         const targetName = document.getElementById('newWithdrawAccName').value.trim();
-
-        if (!targetAcc || !targetName) {
-          alert("Please fill in the new bank account number and account name.");
-          return;
-        }
+        if (!targetAcc || !targetName) { alert("Please fill in the new bank account details."); return; }
         payoutDestinationDesc = `${targetBank} - ${targetAcc} (${targetName})`;
       }
 
@@ -1187,7 +1074,6 @@
           balance -= amt; 
           if (id === 1) { nextRoundBet1 = true; bet1Amount = amt; }
           else { nextRoundBet2 = true; bet2Amount = amt; }
-          
           updateBalanceDisplay();
           saveUserBalance();
           const btn = document.getElementById(`mainBtn${id}`);
@@ -1258,11 +1144,6 @@
     function updateBalanceDisplay() {
       document.getElementById('balance').innerText = balance.toLocaleString('en-US', { minimumFractionDigits: 2 });
     }
-
-    // Initialize first lobby state right after load
-    setTimeout(() => {
-      forceResetToLobbyState();
-    }, 500);
   </script>
 </body>
 </html>
