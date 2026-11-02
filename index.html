@@ -526,10 +526,9 @@
 
     function triggerNewRoundStart() {
       gameState = 'RUNNING';
-      // Generate secure random crash point (house edge weighted)
       let r = Math.random();
       if (r < 0.05) {
-        crashMultiplier = 1.00; // instant crash
+        crashMultiplier = 1.00;
       } else {
         crashMultiplier = parseFloat((1.01 + (0.95 / (1.0 - Math.random() * 0.95) - 0.95) * 0.15).toFixed(2));
         if (crashMultiplier > 350.0) crashMultiplier = 350.0;
@@ -575,7 +574,6 @@
         if (gameState !== 'RUNNING') return;
         
         let elapsed = (Date.now() - startTime) / 1000;
-        // Exponential multiplier progression speed
         currentMultiplier = parseFloat((1.00 + Math.pow(elapsed * 0.55, 1.8)).toFixed(2));
 
         if (currentMultiplier >= crashMultiplier) {
@@ -1260,6 +1258,11 @@
     function updateBalanceDisplay() {
       document.getElementById('balance').innerText = balance.toLocaleString('en-US', { minimumFractionDigits: 2 });
     }
+
+    // Initialize first lobby state right after load
+    setTimeout(() => {
+      forceResetToLobbyState();
+    }, 500);
   </script>
 </body>
 </html>
