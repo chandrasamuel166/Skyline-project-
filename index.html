@@ -6,8 +6,6 @@
   <title>SKYLINE</title>
   <!-- Paystack Inline Script -->
   <script src="https://js.paystack.co/v1/inline.js"></script>
-  <!-- Socket.io Client Script -->
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
@@ -354,9 +352,8 @@
 
   <script>
     // ==========================================
-    // GLOBAL SOCKET & BACKEND CONNECTION
+    // LOCAL STANDALONE GAME ENGINE (GITHUB PAGES)
     // ==========================================
-    let socket;
     let canvas, ctx;
     let animationFrameId;
 
@@ -380,7 +377,7 @@
     });
 
     // ==========================================
-    // STRICT 7-SECOND WAITING TIMER & WATCHDOG
+    // LOCAL GAME LOOP & MULTIPLIER GENERATOR
     // ==========================================
     let currentLivePlayerCount = 4150;
     let playerTickerInterval = null;
@@ -406,7 +403,10 @@
         remainingWaitSeconds -= 0.1;
         if (remainingWaitSeconds <= 0) {
           remainingWaitSeconds = 0.0;
-          if (statusEl) statusEl.innerText = `WAITING FOR SERVER...`;
+          if (statusEl) statusEl.innerText = `STARTING FLIGHT...`;
+          setTimeout(() => {
+            if (gameState === 'IDLE') triggerNewRoundStart();
+          }, 400);
         } else {
           if (statusEl) {
             statusEl.innerText = `NEXT ROUND IN ${remainingWaitSeconds.toFixed(1)}s`;
@@ -448,7 +448,7 @@
     }
 
     // ==========================================
-    // SIMULATED PLAYERS ENGINE (LOCKED CUMULATIVE WIN)
+    // SIMULATED PLAYERS ENGINE (CONTINUOUS ROLLING WINS)
     // ==========================================
     let activeSimPlayers = [
       { name: "k***3", bet: 45000, cashed: false, cashX: 1.35, win: 0, avatar: "🕶️" },
@@ -479,6 +479,11 @@
           p.cashed = true;
           p.win = p.bet * p.cashX;
         } 
+        else if (p.cashed && currentMultiplier > p.cashX * 1.5) {
+          p.cashed = false;
+          p.cashX = parseFloat((currentMultiplier + 2.0 + Math.random() * 15.0).toFixed(2));
+          p.win = p.bet * p.cashX;
+        }
       });
 
       const badgeEl = document.querySelector('.bets-count-badge');
@@ -515,26 +520,71 @@
     }
 
     // ==========================================
-    // SOCKET LISTENERS & BULLETPROOF BET STATES
+    // ROUND & FLIGHT SIMULATION LOOP
     // ==========================================
-    function initSocketConnection() {
-      if (typeof io === 'undefined') return;
+    let flightInterval = null;
 
-      socket = io('https://skyline-project.onrender.com', {
-        reconnection: true,
-        reconnectionAttempts: Infinity,
-        reconnectionDelay: 500,
-        timeout: 10000
-      });
+    function triggerNewRoundStart() {
+      gameState = 'RUNNING';
+      // Generate secure random crash point (house edge weighted)
+      let r = Math.random();
+      if (r < 0.05) {
+        crashMultiplier = 1.00; // instant crash
+      } else {
+        crashMultiplier = parseFloat((1.01 + (0.95 / (1.0 - Math.random() * 0.95) - 0.95) * 0.15).toFixed(2));
+        if (crashMultiplier > 350.0) crashMultiplier = 350.0;
+      }
 
-      socket.on('connect', () => {
-        console.log('Connected to Render backend successfully!');
-      });
+      currentMultiplier = 1.00;
+      
+      if (waitingCountdownTimer) clearInterval(waitingCountdownTimer);
 
-      socket.on('multiplier_update', (data) => {
+      resetSimulatedPlayers();
+      startFlightPhaseTraffic();
+      startFlightAmbience();
+
+      document.getElementById('statusText').innerText = ''; 
+      document.getElementById('multiplierText').style.color = '#ffffff';
+      
+      if (nextRoundBet1) {
+        bet1Active = true;
+        bet1CashedOut = false;
+        nextRoundBet1 = false;
+        setBtnCashoutMode(1);
+      } else {
+        bet1Active = false;
+        bet1CashedOut = false;
+        resetButtonUI(1);
+      }
+
+      if (nextRoundBet2) {
+        bet2Active = true;
+        bet2CashedOut = false;
+        nextRoundBet2 = false;
+        setBtnCashoutMode(2);
+      } else {
+        bet2Active = false;
+        bet2CashedOut = false;
+        resetButtonUI(2);
+      }
+
+      if (flightInterval) clearInterval(flightInterval);
+      let startTime = Date.now();
+
+      flightInterval = setInterval(() => {
         if (gameState !== 'RUNNING') return;
+        
+        let elapsed = (Date.now() - startTime) / 1000;
+        // Exponential multiplier progression speed
+        currentMultiplier = parseFloat((1.00 + Math.pow(elapsed * 0.55, 1.8)).toFixed(2));
 
-        currentMultiplier = data.currentMultiplier;
+        if (currentMultiplier >= crashMultiplier) {
+          currentMultiplier = crashMultiplier;
+          clearInterval(flightInterval);
+          triggerFlyAway();
+          return;
+        }
+
         document.getElementById('multiplierText').innerText = currentMultiplier.toFixed(2) + 'x';
         
         checkAutoCashOut(1);
@@ -547,56 +597,7 @@
         if (bet2Active && !bet2CashedOut) {
           document.getElementById('subBtn2').innerText = `${(bet2Amount * currentMultiplier).toFixed(2)} NGN`;
         }
-      });
-
-      socket.on('round_idle', (data) => {
-        // Safe lobby state: preserves user's queued next-round bets
-      });
-
-      socket.on('round_started', (data) => {
-        gameState = 'RUNNING';
-        crashMultiplier = data.crashPoint;
-        currentMultiplier = 1.00;
-        
-        if (waitingCountdownTimer) clearInterval(waitingCountdownTimer);
-
-        resetSimulatedPlayers();
-        startFlightPhaseTraffic();
-        startFlightAmbience();
-
-        document.getElementById('statusText').innerText = ''; 
-        document.getElementById('multiplierText').style.color = '#ffffff';
-        
-        // Safely transition queued bets into active gameplay without resetting them
-        if (nextRoundBet1) {
-          bet1Active = true;
-          bet1CashedOut = false;
-          nextRoundBet1 = false;
-          setBtnCashoutMode(1);
-        } else {
-          bet1Active = false;
-          bet1CashedOut = false;
-          resetButtonUI(1);
-        }
-
-        if (nextRoundBet2) {
-          bet2Active = true;
-          bet2CashedOut = false;
-          nextRoundBet2 = false;
-          setBtnCashoutMode(2);
-        } else {
-          bet2Active = false;
-          bet2CashedOut = false;
-          resetButtonUI(2);
-        }
-      });
-
-      socket.on('round_crashed', (data) => {
-        if (gameState === 'RUNNING') {
-          crashMultiplier = data.crashPoint;
-          triggerFlyAway();
-        }
-      });
+      }, 50);
     }
 
     function forceResetToLobbyState() {
@@ -607,7 +608,6 @@
       document.getElementById('multiplierText').style.color = '#ffffff';
       document.getElementById('multiplierText').innerText = '1.00x';
       
-      // If user queued bets for the upcoming round during the previous flight/crash, retain them
       if (nextRoundBet1) {
         const btn = document.getElementById('mainBtn1');
         btn.className = 'btn-action-giant btn-waiting-mode';
@@ -633,13 +633,12 @@
       resetSimulatedPlayers();
     }
 
-    initSocketConnection();
-
     // ==========================================
     // GAME & USER STATE
     // ==========================================
     let balance = 2900.00;
     let soundEnabled = true;
+    let currentUserKey = null;
     
     let userDepositProfile = {
       bankName: "Opay",
@@ -680,10 +679,6 @@
       if (document.visibilityState === 'visible') {
         if (audioCtx && audioCtx.state === 'suspended') {
           audioCtx.resume();
-        }
-        
-        if (socket && !socket.connected) {
-          socket.connect();
         }
 
         const statusEl = document.getElementById('statusText');
@@ -809,16 +804,38 @@
         if (!username || !passVal) { alert("Please enter both Username and Password."); return; }
 
         if (username.toLowerCase() !== 'owner') {
-          const savedUserStr = localStorage.getItem('skyline_user_' + username);
-          if (!savedUserStr) {
+          let storedAccountStr = null;
+          let matchedKey = null;
+
+          if (localStorage.getItem('skyline_user_' + username)) {
+            matchedKey = 'skyline_user_' + username;
+          } else {
+            for (let i = 0; i < localStorage.length; i++) {
+              let key = localStorage.key(i);
+              if (key && key.startsWith('skyline_user_') && key.toLowerCase() === 'skyline_user_' + username.toLowerCase()) {
+                matchedKey = key;
+                break;
+              }
+            }
+          }
+
+          if (!matchedKey) {
             alert("Account not found! Please click 'CREATE ACCOUNT' to register first.");
             return;
           }
-          const savedUser = JSON.parse(savedUserStr);
-          if (savedUser.pass !== passVal) {
+
+          storedAccountStr = localStorage.getItem(matchedKey);
+          const accountObj = JSON.parse(storedAccountStr);
+
+          if (accountObj.pass !== passVal) {
             alert("Incorrect password! Please check your password and try again.");
             return;
           }
+
+          if (accountObj.balance !== undefined) {
+            balance = accountObj.balance;
+          }
+          currentUserKey = matchedKey;
         }
       } else {
         username = document.getElementById('regUsernameInput').value.trim();
@@ -831,8 +848,10 @@
           return; 
         }
 
-        const accountData = { username, phone, email, pass };
-        localStorage.setItem('skyline_user_' + username, JSON.stringify(accountData));
+        const accountData = { username, phone, email, pass, balance: 2900.00 };
+        currentUserKey = 'skyline_user_' + username.toLowerCase();
+        localStorage.setItem(currentUserKey, JSON.stringify(accountData));
+        
         alert("Account created successfully! You can now log in.");
         switchAuthTab('login');
         document.getElementById('usernameInput').value = username;
@@ -863,6 +882,18 @@
       updateBalanceDisplay();
       
       startBettingPhaseTraffic();
+    }
+
+    function saveUserBalance() {
+      if (!currentUserKey) return;
+      try {
+        let dataStr = localStorage.getItem(currentUserKey);
+        if (dataStr) {
+          let dataObj = JSON.parse(dataStr);
+          dataObj.balance = balance;
+          localStorage.setItem(currentUserKey, JSON.stringify(dataObj));
+        }
+      } catch (e) {}
     }
 
     function resetButtonUI(id) {
@@ -1082,6 +1113,7 @@
         callback: function(response) {
           balance += addAmt;
           updateBalanceDisplay();
+          saveUserBalance();
           closeWalletModal();
           alert('Deposit Successful! Reference: ' + response.reference);
         },
@@ -1141,6 +1173,7 @@
 
       balance -= wAmt;
       updateBalanceDisplay();
+      saveUserBalance();
       closeWalletModal();
       alert(`Withdrawal request of ₦${wAmt.toLocaleString()} to your ${payoutDestinationDesc} has been submitted successfully!`);
     }
@@ -1151,13 +1184,14 @@
       let isBetActive = (id === 1) ? bet1Active : bet2Active;
       let isCashedOut = (id === 1) ? bet1CashedOut : bet2CashedOut;
 
-      if (gameState === 'IDLE' || document.getElementById('statusText').innerText.includes('NEXT ROUND') || document.getElementById('statusText').innerText.includes('WAITING')) {
+      if (gameState === 'IDLE' || document.getElementById('statusText').innerText.includes('NEXT ROUND') || document.getElementById('statusText').innerText.includes('WAITING') || document.getElementById('statusText').innerText.includes('STARTING')) {
         if (!isQueued && amt <= balance) {
           balance -= amt; 
           if (id === 1) { nextRoundBet1 = true; bet1Amount = amt; }
           else { nextRoundBet2 = true; bet2Amount = amt; }
           
           updateBalanceDisplay();
+          saveUserBalance();
           const btn = document.getElementById(`mainBtn${id}`);
           btn.className = 'btn-action-giant btn-waiting-mode';
           btn.querySelector('span').innerText = 'Cancel';
@@ -1166,6 +1200,7 @@
           balance += amt;
           if (id === 1) { nextRoundBet1 = false; } else { nextRoundBet2 = false; }
           updateBalanceDisplay();
+          saveUserBalance();
           resetButtonUI(id);
         }
       } else if (gameState === 'RUNNING' && isBetActive && !isCashedOut) {
@@ -1181,6 +1216,7 @@
       const win = activeAmt * currentMultiplier;
       balance += win; 
       updateBalanceDisplay();
+      saveUserBalance();
       playSound('win');
       
       const btn = document.getElementById(`mainBtn${id}`);
