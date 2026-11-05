@@ -13,11 +13,11 @@
     .plane-icon { font-size: 4rem; animation: floatPlane 1.5s infinite ease-in-out alternate; }
     @keyframes floatPlane { 0% { transform: translateY(0); } 100% { transform: translateY(-15px); } }
     .loader-bar { width: 200px; height: 6px; background: #222; border-radius: 10px; overflow: hidden; margin-top: 25px; }
-    .loader-fill { width: 100%; height: 100%; background: #38bdf8; }
+    .loader-fill { width: 0%; height: 100%; background: #38bdf8; transition: width 0.3s; }
     
     input[type="text"], input[type="number"], input[type="password"], input[type="tel"], input[type="email"], select { font-size: 16px !important; }
 
-    #loginModal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 9990; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    #loginModal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 9990; display: none; align-items: center; justify-content: center; padding: 20px; }
     .login-card { background: #14181f; border-radius: 16px; padding: 24px; width: 100%; max-width: 360px; border: 1px solid #27272a; text-align: center; }
     .auth-tabs { display: flex; gap: 4px; background: #0b0d11; padding: 4px; border-radius: 10px; margin-bottom: 16px; border: 1px solid #27272a; }
     .auth-tab-btn { flex: 1; padding: 8px; background: transparent; border: none; color: #8e8e93; font-weight: 800; font-size: 0.85rem; border-radius: 6px; cursor: pointer; }
@@ -92,10 +92,11 @@
 </head>
 <body>
 
-  <div id="splashScreen" style="display:none;">
+  <!-- Splash Screen -->
+  <div id="splashScreen">
     <div class="splash-logo">SKYLINE</div>
     <div class="plane-icon">✈️</div>
-    <div class="loader-bar"><div class="loader-fill"></div></div>
+    <div class="loader-bar"><div class="loader-fill" id="splashFill"></div></div>
   </div>
 
   <!-- AUTH MODAL -->
@@ -126,6 +127,7 @@
     </div>
   </div>
 
+  <!-- MAIN APP CONTAINER -->
   <div class="app-container" id="appContainer">
     <header>
       <div class="header-left">
@@ -372,6 +374,25 @@
     let bet2CashedOut = false;
     let nextRoundBet2 = false;
 
+    // Splash Screen Loading Sequence
+    window.addEventListener('load', () => {
+      let fill = document.getElementById('splashFill');
+      let w = 0;
+      let interval = setInterval(() => {
+        w += 25;
+        if (fill) fill.style.width = w + '%';
+        if (w >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            const splash = document.getElementById('splashScreen');
+            if (splash) splash.style.display = 'none';
+            const login = document.getElementById('loginModal');
+            if (login) login.style.display = 'flex';
+          }, 300);
+        }
+      }, 60);
+    });
+
     function startBettingPhaseTraffic() {
       if (playerTickerInterval) clearInterval(playerTickerInterval);
       if (waitingCountdownTimer) clearInterval(waitingCountdownTimer);
@@ -500,10 +521,11 @@
     function triggerNewRoundStart() {
       gameState = 'RUNNING';
       let r = Math.random();
+      // Ensure crash multiplier is safely above 1.1x so the plane takes off smoothly
       if (r < 0.05) {
-        crashMultiplier = 1.00;
+        crashMultiplier = 1.25;
       } else {
-        crashMultiplier = parseFloat((1.01 + (0.95 / (1.0 - Math.random() * 0.95) - 0.95) * 0.15).toFixed(2));
+        crashMultiplier = parseFloat((1.15 + (0.95 / (1.0 - Math.random() * 0.95) - 0.95) * 0.25).toFixed(2));
         if (crashMultiplier > 350.0) crashMultiplier = 350.0;
       }
 
@@ -713,31 +735,27 @@
         if (!username || !passVal) { alert("Please enter both Username and Password."); return; }
 
         if (username.toLowerCase() !== 'owner') {
-          let storedAccountStr = null;
           let matchedKey = null;
+          let targetLower = 'skyline_user_' + username.toLowerCase();
 
-          if (localStorage.getItem('skyline_user_' + username)) {
-            matchedKey = 'skyline_user_' + username;
-          } else {
-            for (let i = 0; i < localStorage.length; i++) {
-              let key = localStorage.key(i);
-              if (key && key.startsWith('skyline_user_') && key.toLowerCase() === 'skyline_user_' + username.toLowerCase()) {
-                matchedKey = key;
-                break;
-              }
+          for (let i = 0; i < localStorage.length; i++) {
+            let key = localStorage.key(i);
+            if (key && key.toLowerCase() === targetLower) {
+              matchedKey = key;
+              break;
             }
           }
 
           if (!matchedKey) {
-            alert("Account not found! Please click 'CREATE ACCOUNT' to register first.");
+            alert("Account not found! Please check your username or click 'CREATE ACCOUNT'.");
             return;
           }
 
-          storedAccountStr = localStorage.getItem(matchedKey);
+          let storedAccountStr = localStorage.getItem(matchedKey);
           const accountObj = JSON.parse(storedAccountStr);
 
           if (accountObj.pass !== passVal) {
-            alert("Incorrect password! Please check your password and try again.");
+            alert("Incorrect password! Please try again.");
             return;
           }
 
