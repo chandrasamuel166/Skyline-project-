@@ -8,12 +8,13 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     body { background-color: #0d0f12; color: #ffffff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; touch-action: manipulation; }
+    
     #splashScreen { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; user-select: none; }
     .splash-logo { font-size: 3rem; font-weight: 900; color: #38bdf8; font-style: italic; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; }
     .plane-icon { font-size: 4rem; animation: floatPlane 1.5s infinite ease-in-out alternate; }
     @keyframes floatPlane { 0% { transform: translateY(0); } 100% { transform: translateY(-15px); } }
     .loader-bar { width: 200px; height: 6px; background: #222; border-radius: 10px; overflow: hidden; margin-top: 25px; }
-    .loader-fill { width: 0%; height: 100%; background: #38bdf8; transition: width 0.3s; }
+    .loader-fill { width: 0%; height: 100%; background: #38bdf8; transition: width 0.1s linear; }
     
     input[type="text"], input[type="number"], input[type="password"], input[type="tel"], input[type="email"], select { font-size: 16px !important; }
 
@@ -92,7 +93,7 @@
 </head>
 <body>
 
-  <!-- Splash Screen -->
+  <!-- Splash Screen (Properly visible on first load) -->
   <div id="splashScreen">
     <div class="splash-logo">SKYLINE</div>
     <div class="plane-icon">✈️</div>
@@ -184,7 +185,7 @@
             </div>
             <div class="auto-cash-row">
               <span>Auto Cash Out</span>
-              <input type="number" id="autoCash1" class="auto-cash-input" placeholder="2.00" step="0.1" min="1.01" max="1000" />
+              <input type="number" id="autoCash1" class="auto-cash-input" placeholder="2.00" step="0.1" min="1.01" max="3000" />
             </div>
           </div>
           <button id="mainBtn1" class="btn-action-giant" onclick="handleBetAction(1)">
@@ -211,7 +212,7 @@
             </div>
             <div class="auto-cash-row">
               <span>Auto Cash Out</span>
-              <input type="number" id="autoCash2" class="auto-cash-input" placeholder="2.00" step="0.1" min="1.01" max="1000" />
+              <input type="number" id="autoCash2" class="auto-cash-input" placeholder="2.00" step="0.1" min="1.01" max="3000" />
             </div>
           </div>
           <button id="mainBtn2" class="btn-action-giant" onclick="handleBetAction(2)">
@@ -374,12 +375,12 @@
     let bet2CashedOut = false;
     let nextRoundBet2 = false;
 
-    // Splash Screen Loading Sequence
-    window.addEventListener('load', () => {
+    // Guaranteed Splash Screen Execution
+    window.addEventListener('DOMContentLoaded', () => {
       let fill = document.getElementById('splashFill');
       let w = 0;
       let interval = setInterval(() => {
-        w += 25;
+        w += 20;
         if (fill) fill.style.width = w + '%';
         if (w >= 100) {
           clearInterval(interval);
@@ -390,7 +391,7 @@
             if (login) login.style.display = 'flex';
           }, 300);
         }
-      }, 60);
+      }, 50);
     });
 
     function startBettingPhaseTraffic() {
@@ -520,13 +521,19 @@
 
     function triggerNewRoundStart() {
       gameState = 'RUNNING';
+      
+      // Robust multiplier generation: allowing high flights up to 3000x safely
       let r = Math.random();
-      // Ensure crash multiplier is safely above 1.1x so the plane takes off smoothly
-      if (r < 0.05) {
-        crashMultiplier = 1.25;
+      if (r < 0.03) {
+        crashMultiplier = 1.00; // Rare instant crash (House edge)
+      } else if (r < 0.30) {
+        crashMultiplier = parseFloat((1.05 + Math.random() * 2.5).toFixed(2)); // Short flight
+      } else if (r < 0.85) {
+        crashMultiplier = parseFloat((3.5 + Math.random() * 45.0).toFixed(2)); // Medium flight
+      } else if (r < 0.98) {
+        crashMultiplier = parseFloat((50.0 + Math.random() * 450.0).toFixed(2)); // High multiplier
       } else {
-        crashMultiplier = parseFloat((1.15 + (0.95 / (1.0 - Math.random() * 0.95) - 0.95) * 0.25).toFixed(2));
-        if (crashMultiplier > 350.0) crashMultiplier = 350.0;
+        crashMultiplier = parseFloat((500.0 + Math.random() * 2500.0).toFixed(2)); // Mega multiplier up to 3000x
       }
 
       currentMultiplier = 1.00;
@@ -568,7 +575,8 @@
         if (gameState !== 'RUNNING') return;
         
         let elapsed = (Date.now() - startTime) / 1000;
-        currentMultiplier = parseFloat((1.00 + Math.pow(elapsed * 0.55, 1.8)).toFixed(2));
+        // Smooth exponential growth curve so it climbs naturally and fast
+        currentMultiplier = parseFloat((1.00 + Math.pow(elapsed * 0.65, 2.1)).toFixed(2));
 
         if (currentMultiplier >= crashMultiplier) {
           currentMultiplier = crashMultiplier;
@@ -589,7 +597,7 @@
         if (bet2Active && !bet2CashedOut) {
           document.getElementById('subBtn2').innerText = `${(bet2Amount * currentMultiplier).toFixed(2)} NGN`;
         }
-      }, 50);
+      }, 40);
     }
 
     function forceResetToLobbyState() {
@@ -736,26 +744,33 @@
 
         if (username.toLowerCase() !== 'owner') {
           let matchedKey = null;
-          let targetLower = 'skyline_user_' + username.toLowerCase();
+          let targetLowerKey = 'skyline_user_' + username.toLowerCase();
 
+          // Flexible Account Key Matching across localStorage
           for (let i = 0; i < localStorage.length; i++) {
             let key = localStorage.key(i);
-            if (key && key.toLowerCase() === targetLower) {
+            if (key && key.toLowerCase() === targetLowerKey) {
               matchedKey = key;
               break;
             }
           }
 
           if (!matchedKey) {
-            alert("Account not found! Please check your username or click 'CREATE ACCOUNT'.");
+            alert("Account not found! Please check your spelling or click 'CREATE ACCOUNT' to register.");
             return;
           }
 
           let storedAccountStr = localStorage.getItem(matchedKey);
-          const accountObj = JSON.parse(storedAccountStr);
+          let accountObj;
+          try {
+            accountObj = JSON.parse(storedAccountStr);
+          } catch (e) {
+            alert("Account data error. Please re-register.");
+            return;
+          }
 
           if (accountObj.pass !== passVal) {
-            alert("Incorrect password! Please try again.");
+            alert("Incorrect password! Please check your password and try again.");
             return;
           }
 
@@ -779,7 +794,7 @@
         currentUserKey = 'skyline_user_' + username.toLowerCase();
         localStorage.setItem(currentUserKey, JSON.stringify(accountData));
         
-        alert("Account created successfully! You can now log in.");
+        alert("Account created successfully! You can now log in with your credentials.");
         switchAuthTab('login');
         document.getElementById('usernameInput').value = username;
         return;
@@ -874,7 +889,7 @@
       if (!ctx || !canvas) return;
       const width = canvas.width;
       const height = canvas.height;
-      let progress = Math.min(1, Math.max(0, (currentMultiplier - 1.00) / 10.0));
+      let progress = Math.min(1, Math.max(0, (currentMultiplier - 1.00) / 50.0));
       let x = width * 0.15 + (width * 0.7 * progress);
       let y = height * 0.85 - (height * 0.65 * progress);
 
