@@ -364,6 +364,7 @@
     let gameState = 'IDLE'; 
     let currentMultiplier = 1.00;
     let crashMultiplier = 1.00;
+    let planeProgress = 0.0; // Dynamic plane trajectory variable
     
     let bet1Active = false;
     let bet1Amount = 50;
@@ -539,6 +540,7 @@
       }
 
       currentMultiplier = 1.00;
+      planeProgress = 0.0;
       if (waitingCountdownTimer) clearInterval(waitingCountdownTimer);
 
       resetSimulatedPlayers();
@@ -578,9 +580,12 @@
         
         let elapsed = (Date.now() - startTime) / 1000;
         
-        // ACCURATE SLOW AVIATOR COUNTING SPEED:
-        // Takes ~6 seconds to get to 2.00x (+0.16x/sec) and scales very slowly and predictably.
-        currentMultiplier = parseFloat((1.00 + elapsed * 0.16 + Math.pow(elapsed, 1.25) * 0.015).toFixed(2));
+        // 1. FAST FLUID PLANE MOTION (Restored to smooth, normal active speed)
+        planeProgress = Math.min(1.0, elapsed * 0.12);
+
+        // 2. PERFECTED SLOW COUNTING NUMBERS (Slowed down to match standard Aviator pace)
+        // Standard formula: +0.06x per second initially, scaling gently over time so 2.00x takes ~10 seconds.
+        currentMultiplier = parseFloat((1.00 + elapsed * 0.06 + Math.pow(elapsed, 1.2) * 0.008).toFixed(2));
 
         if (currentMultiplier >= crashMultiplier) {
           currentMultiplier = crashMultiplier;
@@ -893,10 +898,9 @@
       const width = canvas.width;
       const height = canvas.height;
       
-      // Dynamic screen progress scaling matched to multiplier growth
-      let progress = Math.min(1, Math.max(0, (currentMultiplier - 1.00) / (crashMultiplier > 20 ? 50.0 : 15.0)));
-      let x = width * 0.12 + (width * 0.78 * progress);
-      let y = height * 0.88 - (height * 0.72 * progress);
+      // Smooth plane movement decoupled from multiplier counting speed
+      let x = width * 0.12 + (width * 0.78 * planeProgress);
+      let y = height * 0.88 - (height * 0.72 * planeProgress);
 
       ctx.beginPath();
       ctx.moveTo(width * 0.08, height * 0.90);
