@@ -93,7 +93,7 @@
 </head>
 <body>
 
-  <!-- Splash Screen (Properly visible on first load) -->
+  <!-- Splash Screen -->
   <div id="splashScreen">
     <div class="splash-logo">SKYLINE</div>
     <div class="plane-icon">✈️</div>
@@ -375,7 +375,7 @@
     let bet2CashedOut = false;
     let nextRoundBet2 = false;
 
-    // Guaranteed Splash Screen Execution
+    // Splash Screen Loading Sequence
     window.addEventListener('DOMContentLoaded', () => {
       let fill = document.getElementById('splashFill');
       let w = 0;
@@ -522,18 +522,18 @@
     function triggerNewRoundStart() {
       gameState = 'RUNNING';
       
-      // Robust multiplier generation: allowing high flights up to 3000x safely
+      // Dynamic multiplier distribution supporting high-stakes flights up to 3000x+
       let r = Math.random();
       if (r < 0.03) {
-        crashMultiplier = 1.00; // Rare instant crash (House edge)
-      } else if (r < 0.30) {
-        crashMultiplier = parseFloat((1.05 + Math.random() * 2.5).toFixed(2)); // Short flight
-      } else if (r < 0.85) {
-        crashMultiplier = parseFloat((3.5 + Math.random() * 45.0).toFixed(2)); // Medium flight
-      } else if (r < 0.98) {
-        crashMultiplier = parseFloat((50.0 + Math.random() * 450.0).toFixed(2)); // High multiplier
+        crashMultiplier = 1.00;
+      } else if (r < 0.35) {
+        crashMultiplier = parseFloat((1.05 + Math.random() * 2.5).toFixed(2));
+      } else if (r < 0.80) {
+        crashMultiplier = parseFloat((3.5 + Math.random() * 50.0).toFixed(2));
+      } else if (r < 0.95) {
+        crashMultiplier = parseFloat((55.0 + Math.random() * 450.0).toFixed(2));
       } else {
-        crashMultiplier = parseFloat((500.0 + Math.random() * 2500.0).toFixed(2)); // Mega multiplier up to 3000x
+        crashMultiplier = parseFloat((500.0 + Math.random() * 2500.0).toFixed(2));
       }
 
       currentMultiplier = 1.00;
@@ -575,8 +575,34 @@
         if (gameState !== 'RUNNING') return;
         
         let elapsed = (Date.now() - startTime) / 1000;
-        // Smooth exponential growth curve so it climbs naturally and fast
-        currentMultiplier = parseFloat((1.00 + Math.pow(elapsed * 0.65, 2.1)).toFixed(2));
+        
+        // Strict, authentic slow climbing speed curve matching standard crash games:
+        // Spends several seconds climbing gradually from 1x through single/double digits, 
+        // only moderately speeding up past 100x, and aggressively fast only when approaching 1000x - 3000x+.
+        if (elapsed < 5) {
+          // 1.00x to ~2.5x (Gentle takeoff pace)
+          currentMultiplier = parseFloat((1.00 + elapsed * 0.3).toFixed(2));
+        } else if (elapsed < 15) {
+          // 2.5x to ~10x
+          let t = elapsed - 5;
+          currentMultiplier = parseFloat((2.5 + t * 0.75).toFixed(2));
+        } else if (elapsed < 35) {
+          // 10x to ~50x
+          let t = elapsed - 15;
+          currentMultiplier = parseFloat((10 + t * 2.0).toFixed(2));
+        } else if (elapsed < 60) {
+          // 50x to ~200x
+          let t = elapsed - 35;
+          currentMultiplier = parseFloat((50 + t * 6.0).toFixed(2));
+        } else if (elapsed < 90) {
+          // 200x to ~1000x
+          let t = elapsed - 60;
+          currentMultiplier = parseFloat((200 + t * 26.6).toFixed(2));
+        } else {
+          // Turbo boost towards 3000x+
+          let t = elapsed - 90;
+          currentMultiplier = parseFloat((1000 + Math.pow(t, 1.4) * 45).toFixed(2));
+        }
 
         if (currentMultiplier >= crashMultiplier) {
           currentMultiplier = crashMultiplier;
@@ -597,7 +623,7 @@
         if (bet2Active && !bet2CashedOut) {
           document.getElementById('subBtn2').innerText = `${(bet2Amount * currentMultiplier).toFixed(2)} NGN`;
         }
-      }, 40);
+      }, 50);
     }
 
     function forceResetToLobbyState() {
@@ -746,7 +772,6 @@
           let matchedKey = null;
           let targetLowerKey = 'skyline_user_' + username.toLowerCase();
 
-          // Flexible Account Key Matching across localStorage
           for (let i = 0; i < localStorage.length; i++) {
             let key = localStorage.key(i);
             if (key && key.toLowerCase() === targetLowerKey) {
@@ -889,7 +914,7 @@
       if (!ctx || !canvas) return;
       const width = canvas.width;
       const height = canvas.height;
-      let progress = Math.min(1, Math.max(0, (currentMultiplier - 1.00) / 50.0));
+      let progress = Math.min(1, Math.max(0, (currentMultiplier - 1.00) / 1000.0));
       let x = width * 0.15 + (width * 0.7 * progress);
       let y = height * 0.85 - (height * 0.65 * progress);
 
