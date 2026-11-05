@@ -4,9 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <title>SKYLINE</title>
-  <!-- Paystack Inline Script -->
   <script src="https://js.paystack.co/v1/inline.js"></script>
-
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     body { background-color: #0d0f12; color: #ffffff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; touch-action: manipulation; }
@@ -15,13 +13,11 @@
     .plane-icon { font-size: 4rem; animation: floatPlane 1.5s infinite ease-in-out alternate; }
     @keyframes floatPlane { 0% { transform: translateY(0); } 100% { transform: translateY(-15px); } }
     .loader-bar { width: 200px; height: 6px; background: #222; border-radius: 10px; overflow: hidden; margin-top: 25px; }
-    .loader-fill { width: 0%; height: 100%; background: #38bdf8; transition: width 0.3s; }
+    .loader-fill { width: 100%; height: 100%; background: #38bdf8; }
     
-    input[type="text"], input[type="number"], input[type="password"], input[type="tel"], input[type="email"], select {
-      font-size: 16px !important;
-    }
+    input[type="text"], input[type="number"], input[type="password"], input[type="tel"], input[type="email"], select { font-size: 16px !important; }
 
-    #loginModal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 9990; display: none; align-items: center; justify-content: center; padding: 20px; }
+    #loginModal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 9990; display: flex; align-items: center; justify-content: center; padding: 20px; }
     .login-card { background: #14181f; border-radius: 16px; padding: 24px; width: 100%; max-width: 360px; border: 1px solid #27272a; text-align: center; }
     .auth-tabs { display: flex; gap: 4px; background: #0b0d11; padding: 4px; border-radius: 10px; margin-bottom: 16px; border: 1px solid #27272a; }
     .auth-tab-btn { flex: 1; padding: 8px; background: transparent; border: none; color: #8e8e93; font-weight: 800; font-size: 0.85rem; border-radius: 6px; cursor: pointer; }
@@ -96,10 +92,10 @@
 </head>
 <body>
 
-  <div id="splashScreen">
+  <div id="splashScreen" style="display:none;">
     <div class="splash-logo">SKYLINE</div>
     <div class="plane-icon">✈️</div>
-    <div class="loader-bar"><div class="loader-fill" id="splashFill"></div></div>
+    <div class="loader-bar"><div class="loader-fill"></div></div>
   </div>
 
   <!-- AUTH MODAL -->
@@ -375,18 +371,6 @@
     let bet2Amount = 50;
     let bet2CashedOut = false;
     let nextRoundBet2 = false;
-
-    // Guaranteed Splash Initialization
-    window.addEventListener('DOMContentLoaded', () => {
-      let fill = document.getElementById('splashFill');
-      if (fill) fill.style.width = '100%';
-      setTimeout(() => {
-        const splash = document.getElementById('splashScreen');
-        if (splash) splash.style.display = 'none';
-        const login = document.getElementById('loginModal');
-        if (login) login.style.display = 'flex';
-      }, 400);
-    });
 
     function startBettingPhaseTraffic() {
       if (playerTickerInterval) clearInterval(playerTickerInterval);
