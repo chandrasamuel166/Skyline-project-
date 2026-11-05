@@ -364,7 +364,7 @@
     let gameState = 'IDLE'; 
     let currentMultiplier = 1.00;
     let crashMultiplier = 1.00;
-    let planeProgress = 0.0; // Dynamic plane trajectory variable
+    let planeProgress = 0.0;
     
     let bet1Active = false;
     let bet1Amount = 50;
@@ -523,20 +523,19 @@
     function triggerNewRoundStart() {
       gameState = 'RUNNING';
       
-      // Standard Aviator multiplier distribution curve
       let r = Math.random();
       if (r < 0.05) {
-        crashMultiplier = 1.00; // Immediate 1x crash
+        crashMultiplier = 1.00;
       } else if (r < 0.40) {
-        crashMultiplier = parseFloat((1.01 + Math.random() * 1.99).toFixed(2)); // 1.01x - 3x
+        crashMultiplier = parseFloat((1.01 + Math.random() * 1.99).toFixed(2));
       } else if (r < 0.75) {
-        crashMultiplier = parseFloat((3.0 + Math.random() * 17.0).toFixed(2)); // 3x - 20x
+        crashMultiplier = parseFloat((3.0 + Math.random() * 17.0).toFixed(2));
       } else if (r < 0.92) {
-        crashMultiplier = parseFloat((20.0 + Math.random() * 180.0).toFixed(2)); // 20x - 200x
+        crashMultiplier = parseFloat((20.0 + Math.random() * 180.0).toFixed(2));
       } else if (r < 0.98) {
-        crashMultiplier = parseFloat((200.0 + Math.random() * 800.0).toFixed(2)); // 200x - 1000x
+        crashMultiplier = parseFloat((200.0 + Math.random() * 800.0).toFixed(2));
       } else {
-        crashMultiplier = parseFloat((1000.0 + Math.random() * 2000.0).toFixed(2)); // 3000x+
+        crashMultiplier = parseFloat((1000.0 + Math.random() * 2000.0).toFixed(2));
       }
 
       currentMultiplier = 1.00;
@@ -580,12 +579,21 @@
         
         let elapsed = (Date.now() - startTime) / 1000;
         
-        // 1. FAST FLUID PLANE MOTION (Restored to smooth, normal active speed)
+        // Dynamic plane flight movement across screen
         planeProgress = Math.min(1.0, elapsed * 0.12);
 
-        // 2. PERFECTED SLOW COUNTING NUMBERS (Slowed down to match standard Aviator pace)
-        // Standard formula: +0.06x per second initially, scaling gently over time so 2.00x takes ~10 seconds.
-        currentMultiplier = parseFloat((1.00 + elapsed * 0.06 + Math.pow(elapsed, 1.2) * 0.008).toFixed(2));
+        // PERFECT AVIATOR PACE:
+        // Starts steady (~4-5 seconds to reach 2.00x), ramps naturally up to 100x, and accelerates faster past 100x+
+        let calcVal;
+        if (elapsed <= 15) {
+          calcVal = 1.00 + (elapsed * 0.18) + (Math.pow(elapsed, 2) * 0.015);
+        } else {
+          let baseAt15 = 1.00 + (15 * 0.18) + (Math.pow(15, 2) * 0.015);
+          let extraTime = elapsed - 15;
+          calcVal = baseAt15 * Math.exp(extraTime * 0.15);
+        }
+
+        currentMultiplier = parseFloat(calcVal.toFixed(2));
 
         if (currentMultiplier >= crashMultiplier) {
           currentMultiplier = crashMultiplier;
@@ -898,7 +906,6 @@
       const width = canvas.width;
       const height = canvas.height;
       
-      // Smooth plane movement decoupled from multiplier counting speed
       let x = width * 0.12 + (width * 0.78 * planeProgress);
       let y = height * 0.88 - (height * 0.72 * planeProgress);
 
