@@ -578,8 +578,9 @@
         
         let elapsed = (Date.now() - startTime) / 1000;
         
-        // TRUE CLASSIC AVIATOR SPEED: Slow, natural, linear mathematical climb (approx +0.15x to +0.2x per second initially, scaling gently over time)
-        currentMultiplier = parseFloat((1.00 + elapsed * 0.18 + Math.pow(elapsed, 1.35) * 0.04).toFixed(2));
+        // ACCURATE SLOW AVIATOR COUNTING SPEED:
+        // Takes ~6 seconds to get to 2.00x (+0.16x/sec) and scales very slowly and predictably.
+        currentMultiplier = parseFloat((1.00 + elapsed * 0.16 + Math.pow(elapsed, 1.25) * 0.015).toFixed(2));
 
         if (currentMultiplier >= crashMultiplier) {
           currentMultiplier = crashMultiplier;
@@ -734,7 +735,7 @@
         tabReg.classList.add('active');
         tabLog.classList.remove('active');
         paneReg.classList.add('active');
-        paneLog.classList.remove('active');
+        paneReg.classList.remove('active');
       }
     }
 
@@ -892,8 +893,8 @@
       const width = canvas.width;
       const height = canvas.height;
       
-      // Fluid, linear percentage calculation ensuring smooth plane movement across all multipliers
-      let progress = Math.min(1, Math.max(0, (currentMultiplier - 1.00) / 100.0));
+      // Dynamic screen progress scaling matched to multiplier growth
+      let progress = Math.min(1, Math.max(0, (currentMultiplier - 1.00) / (crashMultiplier > 20 ? 50.0 : 15.0)));
       let x = width * 0.12 + (width * 0.78 * progress);
       let y = height * 0.88 - (height * 0.72 * progress);
 
