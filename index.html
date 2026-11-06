@@ -572,21 +572,25 @@
       }
 
       if (flightInterval) clearInterval(flightInterval);
-      let startTime = Date.now();
 
+      // EXACT AVIATOR TICK ENGINE (40ms ticks = 25 updates per second)
       flightInterval = setInterval(() => {
         if (gameState !== 'RUNNING') return;
         
-        let elapsed = (Date.now() - startTime) / 1000;
-        
-        // Plane motion tracks smoothly with current multiplier growth
-        planeProgress = Math.min(1.0, Math.log10(currentMultiplier + 1) / Math.log10(2001));
+        let increment;
+        if (currentMultiplier < 2.00) {
+          increment = 0.01; // Smooth pace reaching 2.00x in ~4.0 seconds
+        } else if (currentMultiplier < 10.00) {
+          increment = 0.03; // Steady mid-range progression
+        } else if (currentMultiplier < 50.00) {
+          increment = 0.15; // Natural building momentum
+        } else if (currentMultiplier < 100.00) {
+          increment = 0.50; // Faster progression
+        } else {
+          increment = currentMultiplier * 0.04; // High-stakes exponential surge past 100x+
+        }
 
-        // AUTHENTIC AVIATOR MULTIPLIER SPEED CURVE:
-        // Smooth and responsive at the start, reaching 2.00x in ~4.2 seconds, 
-        // scaling steadily through mid-multipliers, and accelerating aggressively when pushing past 100x+.
-        let calcVal = Math.pow(1.055, elapsed * 2.15); 
-        currentMultiplier = parseFloat(calcVal.toFixed(2));
+        currentMultiplier = parseFloat((currentMultiplier + increment).toFixed(2));
 
         if (currentMultiplier >= crashMultiplier) {
           currentMultiplier = crashMultiplier;
@@ -596,6 +600,7 @@
         }
 
         document.getElementById('multiplierText').innerText = currentMultiplier.toFixed(2) + 'x';
+        planeProgress = Math.min(1.0, Math.log10(currentMultiplier) / Math.log10(2000));
         
         checkAutoCashOut(1);
         checkAutoCashOut(2);
@@ -607,7 +612,7 @@
         if (bet2Active && !bet2CashedOut) {
           document.getElementById('subBtn2').innerText = `${(bet2Amount * currentMultiplier).toFixed(2)} NGN`;
         }
-      }, 50);
+      }, 40);
     }
 
     function forceResetToLobbyState() {
