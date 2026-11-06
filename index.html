@@ -582,9 +582,8 @@
         // Plane motion tracks smoothly with current multiplier growth
         planeProgress = Math.min(1.0, Math.log10(currentMultiplier + 1) / Math.log10(2001));
 
-        // AUTHENTIC AVIATOR SPEED CURVE:
-        // Gradual, slow start from 1.00x through 2x and higher, accelerating progressively as it reaches 50x, 100x and beyond.
-        let calcVal = 1.0 + Math.pow(elapsed, 1.48) * 0.085 + Math.pow(elapsed, 2.65) * 0.00015;
+        // ORIGINAL NORMAL AVIATOR SPEED CURVE (Restored):
+        let calcVal = Math.pow(1.063, elapsed * 2.35);
         currentMultiplier = parseFloat(calcVal.toFixed(2));
 
         if (currentMultiplier >= crashMultiplier) {
